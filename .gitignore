@@ -1,0 +1,13 @@
+.vs/
+.vscode/
+bin/
+bin-int/
+Web/
+!vendor/bin/
+*.sln
+*.vcxproj*
+Makefile
+Scripts/EMBuild.bat
+Boxfish_wrapper.cpp
+SwigConfigWindows.lua
+SwigConfigLinux.lua
