@@ -5,6 +5,7 @@
 #include "EvalConstants.h"
 #include "Attacks.h"
 #include "MoveGeneration.h"
+#include "Search.h"
 
 namespace Storm
 {

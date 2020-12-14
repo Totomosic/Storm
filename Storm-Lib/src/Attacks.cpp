@@ -130,7 +130,7 @@ namespace Storm
         attacks |= southRay;
         if (southRay & blockers)
         {
-            attacks &= ~(GetRay(SOUTH, LeastSignificantBit(southRay & blockers)));
+            attacks &= ~(GetRay(SOUTH, MostSignificantBit(southRay & blockers)));
         }
 
         BitBoard eastRay = GetRay(EAST, square);
@@ -144,7 +144,7 @@ namespace Storm
         attacks |= westRay;
         if (westRay & blockers)
         {
-            attacks &= ~(GetRay(WEST, LeastSignificantBit(westRay & blockers)));
+            attacks &= ~(GetRay(WEST, MostSignificantBit(westRay & blockers)));
         }
         return attacks;
     }
@@ -170,14 +170,14 @@ namespace Storm
         attacks |= southEastRay;
         if (southEastRay & blockers)
         {
-            attacks &= ~(GetRay(SOUTH_EAST, LeastSignificantBit(southEastRay & blockers)));
+            attacks &= ~(GetRay(SOUTH_EAST, MostSignificantBit(southEastRay & blockers)));
         }
 
         BitBoard southWestRay = GetRay(SOUTH_WEST, square);
         attacks |= southWestRay;
         if (southWestRay & blockers)
         {
-            attacks &= ~(GetRay(SOUTH_WEST, LeastSignificantBit(southWestRay & blockers)));
+            attacks &= ~(GetRay(SOUTH_WEST, MostSignificantBit(southWestRay & blockers)));
         }
         return attacks;
     }

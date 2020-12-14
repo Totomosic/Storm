@@ -1,18 +1,62 @@
 #include "Position.h"
 #include "Format.h"
 #include "EvalConstants.h"
+#include "Attacks.h"
 
 namespace Storm
 {
 
-	void Position::ApplyMove(Move move)
+	void Position::Initialize()
+	{
+		Cache.NonPawnMaterial[COLOR_WHITE] = 0;
+		Cache.NonPawnMaterial[COLOR_BLACK] = 0;
+
+		for (SquareIndex sq = a1; sq < SQUARE_MAX; sq++)
+			Cache.PieceOnSquare[sq] = PIECE_NONE;
+
+		Cache.ColorPieces[COLOR_WHITE] = ZERO_BB;
+		Cache.ColorPieces[COLOR_BLACK] = ZERO_BB;
+
+		for (Piece piece = PIECE_START; piece < PIECE_MAX; piece++)
+		{
+			Cache.ColorPieces[COLOR_WHITE] |= Colors[COLOR_WHITE].Pieces[piece];
+			Cache.ColorPieces[COLOR_BLACK] |= Colors[COLOR_BLACK].Pieces[piece];
+		}
+
+		Cache.AllPieces = GetPieces(COLOR_WHITE) | GetPieces(COLOR_BLACK);
+
+		for (Piece piece = PIECE_START; piece < PIECE_MAX; piece++)
+		{
+			Cache.PiecesByType[piece] = GetPieces(piece);
+			if (piece != PIECE_PAWN && piece != PIECE_KING)
+			{
+				Cache.NonPawnMaterial[COLOR_WHITE] += GetPieceValueMg(piece);
+				Cache.NonPawnMaterial[COLOR_BLACK] += GetPieceValueMg(piece);
+			}
+			BitBoard pieces = GetPieces(piece);
+			while (pieces)
+			{
+				SquareIndex square = PopLeastSignificantBit(pieces);
+				Cache.PieceOnSquare[square] = piece;
+			}
+		}
+
+		Cache.KingSquare[COLOR_WHITE] = LeastSignificantBit(GetPieces(COLOR_WHITE, PIECE_KING));
+		Cache.KingSquare[COLOR_BLACK] = MostSignificantBit(GetPieces(COLOR_BLACK, PIECE_KING));
+		STORM_ASSERT(Cache.KingSquare[COLOR_WHITE] != ZERO_BB && Cache.KingSquare[COLOR_BLACK] != ZERO_BB, "Couldn't find king");
+
+		Cache.CheckedBy[COLOR_WHITE] = GetAttackersTo(GetKingSquare(COLOR_WHITE), COLOR_BLACK, GetPieces());
+		Cache.CheckedBy[COLOR_BLACK] = GetAttackersTo(GetKingSquare(COLOR_BLACK), COLOR_WHITE, GetPieces());
+
+		UpdateCheckInfo(COLOR_WHITE);
+		UpdateCheckInfo(COLOR_BLACK);
+
+		Hash.SetFromPosition(*this);
+	}
+
+	void Position::ApplyMove(Move move, bool givesCheck)
 	{
 		STORM_ASSERT(move != MOVE_NONE, "Invalid move");
-		if (EnpassantSquare != SQUARE_INVALID)
-		{
-			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
-			EnpassantSquare = SQUARE_INVALID;
-		}
 		const SquareIndex fromSquare = GetFromSquare(move);
 		const SquareIndex toSquare = GetToSquare(move);
 		const Rank fromRank = RankOf(fromSquare);
@@ -23,8 +67,15 @@ namespace Storm
 		const Piece capturedPiece = GetCapturedPiece(move);
 		const bool isPromotion = movingPiece == PIECE_PAWN && toRank == GetPromotionRank(ColorToMove);
 		const bool isCapture = capturedPiece != PIECE_NONE;
-		const bool isCastle = movingPiece == PIECE_KING && fromFile == FILE_E && (toFile == FILE_C || toFile == FILE_G);
+		const bool isCastle = GetMoveType(move) == CASTLE;
+		const bool isEnpassant = movingPiece == PIECE_PAWN && toSquare == EnpassantSquare;
 		const Color otherColor = OtherColor(ColorToMove);
+
+		if (EnpassantSquare != SQUARE_INVALID)
+		{
+			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
+			EnpassantSquare = SQUARE_INVALID;
+		}
 
 		if (isCapture && isPromotion)
 		{
@@ -76,9 +127,9 @@ namespace Storm
 			EnpassantSquare = GetEnpassantSquare(toSquare, ColorToMove);
 			Hash.AddEnPassant(FileOf(EnpassantSquare));
 		}
-		else if (movingPiece == PIECE_PAWN && toSquare == EnpassantSquare)
+		else if (isEnpassant)
 		{
-			RemovePiece(otherColor, PIECE_PAWN, GetEnpassantSquare(toSquare, otherColor));
+			RemovePiece(otherColor, PIECE_PAWN, GetEnpassantSquare(toSquare, ColorToMove));
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
 		}
 		else if (isCastle)
@@ -138,6 +189,11 @@ namespace Storm
 			}
 		}
 
+		Cache.CheckedBy[ColorToMove] = ZERO_BB;
+		if (givesCheck)
+			Cache.CheckedBy[otherColor] = GetAttackersTo(GetKingSquare(otherColor), ColorToMove, GetPieces());
+		UpdateCheckInfo(ColorToMove);
+
 		if (movingPiece == PIECE_PAWN || isCapture)
 			HalfTurnsSinceCaptureOrPush = 0;
 		else
@@ -148,6 +204,147 @@ namespace Storm
 
 		ColorToMove = otherColor;
 		Hash.FlipTeamToPlay();
+	}
+
+	bool Position::GivesCheck(Move move) const
+	{
+		SquareIndex fromSquare = GetFromSquare(move);
+		SquareIndex toSquare = GetToSquare(move);
+		Piece movingPiece = GetPieceOnSquare(fromSquare);
+
+		// Direct check
+		if (Cache.CheckSquares[OtherColor(ColorToMove)][movingPiece - PIECE_START] & toSquare)
+			return true;
+
+		// Discovered check
+		if (GetBlockersForKing(OtherColor(ColorToMove)) & fromSquare && !IsAligned(fromSquare, toSquare, GetKingSquare(OtherColor(ColorToMove))))
+			return true;
+
+		if (movingPiece == PIECE_PAWN && toSquare == EnpassantSquare)
+		{
+			SquareIndex capturedSquare = GetEnpassantSquare(toSquare, ColorToMove);
+			BitBoard blockers = (GetPieces() ^ fromSquare ^ capturedSquare) | toSquare;
+
+			return ((GetAttacks<PIECE_BISHOP>(GetKingSquare(OtherColor(ColorToMove)), blockers) & GetPieces(ColorToMove, PIECE_BISHOP, PIECE_QUEEN)) |
+					(GetAttacks<PIECE_ROOK>(GetKingSquare(OtherColor(ColorToMove)), blockers) & GetPieces(ColorToMove, PIECE_ROOK, PIECE_QUEEN)));
+		}
+
+		if (movingPiece == PIECE_KING)
+		{
+			File fromFile = FileOf(fromSquare);
+			Rank fromRank = RankOf(fromSquare);
+			File toFile = FileOf(toSquare);
+			if (fromFile == FILE_E && toFile == FILE_G)
+			{
+				// Kingside castle
+				SquareIndex rookFrom = CreateSquare(FILE_H, fromRank);
+				SquareIndex rookTo = CreateSquare(FILE_F, fromRank);
+				return GetAttacks<PIECE_ROOK>(rookTo, (GetPieces() ^ rookFrom ^ fromSquare) | toSquare | rookTo) & GetKingSquare(OtherColor(ColorToMove));
+
+			}
+			else if (fromFile == FILE_E && toFile == FILE_C)
+			{
+				// Queenside castle
+				SquareIndex rookFrom = CreateSquare(FILE_A, fromRank);
+				SquareIndex rookTo = CreateSquare(FILE_D, fromRank);
+				return GetAttacks<PIECE_ROOK>(rookTo, (GetPieces() ^ rookFrom ^ fromSquare) | toSquare | rookTo) & GetKingSquare(OtherColor(ColorToMove));
+			}
+		}
+		return false;
+	}
+
+	bool Position::IsLegal(Move move) const
+	{
+		SquareIndex kingSquare = GetKingSquare(ColorToMove);
+		SquareIndex fromSquare = GetFromSquare(move);
+		SquareIndex toSquare = GetToSquare(move);
+		Piece movingPiece = GetPieceOnSquare(fromSquare);
+		if (toSquare == EnpassantSquare && movingPiece == PIECE_PAWN)
+		{
+			SquareIndex capturedSquare = GetEnpassantSquare(toSquare, ColorToMove);
+			BitBoard occupied = (GetPieces() ^ fromSquare ^ capturedSquare) | toSquare;
+			return !(GetAttacks<PIECE_ROOK>(kingSquare, occupied) & GetPieces(OtherColor(ColorToMove), PIECE_QUEEN, PIECE_ROOK))
+				&& !(GetAttacks<PIECE_BISHOP>(kingSquare, occupied) & GetPieces(OtherColor(ColorToMove), PIECE_QUEEN, PIECE_BISHOP));
+		}
+
+		if (Cache.CheckedBy[ColorToMove])
+		{
+			if (GetMoveType(move) == CASTLE)
+				return false;
+			if (movingPiece != PIECE_KING)
+			{
+				if (MoreThanOne(Cache.CheckedBy[ColorToMove]))
+					return false;
+				SquareIndex checkingSquare = LeastSignificantBit(Cache.CheckedBy[ColorToMove]);
+				if (((GetBitBoardBetween(checkingSquare, kingSquare) | Cache.CheckedBy[ColorToMove]) & toSquare) == ZERO_BB)
+					return false;
+			}
+			else if (GetAttackersTo(toSquare, OtherColor(ColorToMove), GetPieces() ^ fromSquare))
+			{
+				return false;
+			}
+		}
+
+		if (GetMoveType(move) == CASTLE)
+		{
+			Rank rank = RankOf(fromSquare);
+			File file = FileOf(toSquare);
+			if (file == FILE_C)
+			{
+				for (SquareIndex square : { CreateSquare(FILE_C, rank), CreateSquare(FILE_D, rank) })
+				{
+					if (GetAttackersTo(square, OtherColor(ColorToMove), GetPieces()))
+						return false;
+				}
+			}
+			else
+			{
+				for (SquareIndex square : { CreateSquare(FILE_F, rank), CreateSquare(FILE_G, rank) })
+				{
+					if (GetAttackersTo(square, OtherColor(ColorToMove), GetPieces()))
+						return false;
+				}
+			}
+			return true;
+		}
+
+		if (movingPiece == PIECE_KING)
+		{
+			return !GetAttackersTo(toSquare, OtherColor(ColorToMove), GetPieces() ^ fromSquare);
+		}
+
+		return !(GetBlockersForKing(ColorToMove) & fromSquare)
+			  || IsAligned(fromSquare, toSquare, kingSquare);
+	}
+
+	BitBoard Position::GetSliderBlockers(BitBoard sliders, SquareIndex toSquare, BitBoard* pinners) const
+	{
+		BitBoard blockers = ZERO_BB;
+		*pinners = ZERO_BB;
+		BitBoard snipers = ((GetAttacks<PIECE_ROOK>(toSquare, ZERO_BB) & GetPieces(PIECE_QUEEN, PIECE_ROOK)) | (GetAttacks<PIECE_BISHOP>(toSquare, ZERO_BB) & GetPieces(PIECE_QUEEN, PIECE_BISHOP))) & sliders;
+		BitBoard occupied = GetPieces() ^ snipers;
+		Color color = GetColorAt(toSquare);
+		while (snipers)
+		{
+			SquareIndex square = PopLeastSignificantBit(snipers);
+			BitBoard between = GetBitBoardBetween(square, toSquare) & occupied;
+			if (between != ZERO_BB && !MoreThanOne(between))
+			{
+				blockers |= between;
+				if (between & GetPieces(color))
+					(*pinners) |= square;
+			}
+		}
+		return blockers;
+	}
+
+	BitBoard Position::GetAttackersTo(SquareIndex square, Color by, BitBoard blockers) const
+	{
+		return (GetAttacks<PIECE_PAWN>(square, OtherColor(by)) & GetPieces(by, PIECE_PAWN)) |
+			(GetAttacks<PIECE_KNIGHT>(square) & GetPieces(by, PIECE_KNIGHT)) |
+			(GetAttacks<PIECE_KING>(square) & GetPieces(by, PIECE_KING)) |
+			(GetAttacks<PIECE_BISHOP>(square, blockers) & GetPieces(by, PIECE_BISHOP, PIECE_QUEEN)) |
+			(GetAttacks<PIECE_ROOK>(square, blockers) & GetPieces(by, PIECE_ROOK, PIECE_QUEEN));
 	}
 
 	void Position::MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to)
@@ -194,6 +391,21 @@ namespace Storm
 		Hash.RemovePieceAt(color, piece, square);
 	}
 
+	void Position::UpdateCheckInfo(Color color)
+	{
+		Cache.BlockersForKing[COLOR_WHITE] = GetSliderBlockers(GetPieces(COLOR_BLACK), GetKingSquare(COLOR_WHITE), &Cache.Pinners[COLOR_BLACK]);
+		Cache.BlockersForKing[COLOR_BLACK] = GetSliderBlockers(GetPieces(COLOR_WHITE), GetKingSquare(COLOR_BLACK), &Cache.Pinners[COLOR_WHITE]);
+
+		SquareIndex kingSquare = GetKingSquare(color);
+
+		Cache.CheckSquares[color][PIECE_PAWN - PIECE_START] = GetAttacks<PIECE_PAWN>(kingSquare, color);
+		Cache.CheckSquares[color][PIECE_KNIGHT - PIECE_START] = GetAttacks<PIECE_KNIGHT>(kingSquare);
+		Cache.CheckSquares[color][PIECE_BISHOP - PIECE_START] = GetAttacks<PIECE_BISHOP>(kingSquare, GetPieces());
+		Cache.CheckSquares[color][PIECE_ROOK - PIECE_START] = GetAttacks<PIECE_ROOK>(kingSquare, GetPieces());
+		Cache.CheckSquares[color][PIECE_QUEEN - PIECE_START] = Cache.CheckSquares[color][PIECE_BISHOP - PIECE_START] | Cache.CheckSquares[color][PIECE_ROOK - PIECE_START];
+		Cache.CheckSquares[color][PIECE_KING - PIECE_START] = ZERO_BB;
+	}
+
     void ClearPosition(Position& position)
     {
         for (Piece piece = PIECE_START; piece < PIECE_MAX; piece++)
@@ -205,48 +417,6 @@ namespace Storm
         position.ColorToMove = COLOR_WHITE;
         position.TotalTurns = 0;
         position.HalfTurnsSinceCaptureOrPush = 0;
-    }
-
-    void InitializePosition(Position& position)
-    {
-        position.Cache.NonPawnMaterial[COLOR_WHITE] = 0;
-        position.Cache.NonPawnMaterial[COLOR_BLACK] = 0;
-
-        for (SquareIndex sq = a1; sq < SQUARE_MAX; sq++)
-            position.Cache.PieceOnSquare[sq] = PIECE_NONE;
-
-		position.Cache.ColorPieces[COLOR_WHITE] = ZERO_BB;
-		position.Cache.ColorPieces[COLOR_BLACK] = ZERO_BB;
-
-		for (Piece piece = PIECE_START; piece < PIECE_MAX; piece++)
-		{
-			position.Cache.ColorPieces[COLOR_WHITE] |= position.Colors[COLOR_WHITE].Pieces[piece];
-			position.Cache.ColorPieces[COLOR_BLACK] |= position.Colors[COLOR_BLACK].Pieces[piece];
-		}
-
-		position.Cache.AllPieces = position.GetPieces(COLOR_WHITE) | position.GetPieces(COLOR_BLACK);
-
-        for (Piece piece = PIECE_START; piece < PIECE_MAX; piece++)
-        {
-            position.Cache.PiecesByType[piece] = position.GetPieces(piece);
-            if (piece != PIECE_PAWN && piece != PIECE_KING)
-            {
-                position.Cache.NonPawnMaterial[COLOR_WHITE] += GetPieceValueMg(piece);
-                position.Cache.NonPawnMaterial[COLOR_BLACK] += GetPieceValueMg(piece);
-            }
-            BitBoard pieces = position.GetPieces(piece);
-            while (pieces)
-            {
-                SquareIndex square = PopLeastSignificantBit(pieces);
-                position.Cache.PieceOnSquare[square] = piece;
-            }
-        }
-
-        position.Cache.KingSquare[COLOR_WHITE] = LeastSignificantBit(position.GetPieces(COLOR_WHITE, PIECE_KING));
-        position.Cache.KingSquare[COLOR_BLACK] = MostSignificantBit(position.GetPieces(COLOR_BLACK, PIECE_KING));
-        STORM_ASSERT(position.Cache.KingSquare[COLOR_WHITE] != ZERO_BB && position.Cache.KingSquare[COLOR_BLACK] != ZERO_BB, "Couldn't find king");
-
-        position.Hash.SetFromPosition(position);
     }
 
     Position CreateStartingPosition()
@@ -291,7 +461,7 @@ namespace Storm
 
 		position.EnpassantSquare = SQUARE_INVALID;
 
-        InitializePosition(position);
+        position.Initialize();
         return position;
     }
 
@@ -410,7 +580,7 @@ namespace Storm
 			position.TotalTurns = 0;
 		}
 
-		InitializePosition(position);
+		position.Initialize();
 		return position;
     }
 

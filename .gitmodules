@@ -1,6 +1,3 @@
-[submodule "Storm-Test/vendor/Catch2"]
-	path = Storm-Test/vendor/Catch2
-	url = https://github.com/catchorg/Catch2
 [submodule "Storm-Lib/vendor/spdlog"]
 	path = Storm-Lib/vendor/spdlog
 	url = https://github.com/gabime/spdlog

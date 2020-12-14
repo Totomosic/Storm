@@ -4,6 +4,8 @@
 namespace Storm
 {
 
+	std::vector<std::string> Split(const std::string& str, const std::string& delimiter);
+
 	class STORM_API UCI
 	{
 	public:
@@ -13,6 +15,7 @@ namespace Storm
 		static SquareIndex SquareFromString(const std::string& square);
 		static std::string SquareToString(SquareIndex square);
 		static std::string FormatMove(Move move);
+		static Move CreateMoveFromString(const Position& position, const std::string& move);
 	};
 
 }

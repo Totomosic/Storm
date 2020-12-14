@@ -2,6 +2,22 @@
 
 namespace Storm
 {
+
+    std::vector<std::string> Split(const std::string& str, const std::string& delimiter)
+    {
+        std::vector<std::string> result;
+        size_t begin = 0;
+        size_t end = str.find(delimiter, begin);
+        while (end != std::string::npos)
+        {
+            result.push_back(str.substr(begin, end - begin));
+            begin = end + delimiter.size();
+            end = str.find(delimiter, begin);
+        }
+        result.push_back(str.substr(begin, end - begin));
+        return result;
+    }
+
     char UCI::PieceToString(Piece type, Color color)
     {
         char offset = color == COLOR_BLACK ? 'a' - 'A' : 0;
@@ -45,6 +61,46 @@ namespace Storm
         SquareIndex from = GetFromSquare(move);
         SquareIndex to = GetToSquare(move);
         return SquareToString(from) + SquareToString(to);
+    }
+
+    Move UCI::CreateMoveFromString(const Position& position, const std::string& uciString)
+    {
+        STORM_ASSERT(uciString.size() >= 4, "Invalid move");
+        File startFile = File(uciString[0] - 'a');
+        Rank startRank = Rank(uciString[1] - '1');
+        File endFile = File(uciString[2] - 'a');
+        Rank endRank = Rank(uciString[3] - '1');
+        Piece promotion = PIECE_QUEEN;
+        if (uciString.size() >= 5)
+        {
+            // support lower case or upper case
+            char promotionChar = uciString[4];
+            if (promotionChar - 'a' < 0)
+                promotionChar += 'a' - 'A';
+            switch (promotionChar)
+            {
+            case 'q':
+                promotion = PIECE_QUEEN;
+                break;
+            case 'n':
+                promotion = PIECE_KNIGHT;
+                break;
+            case 'r':
+                promotion = PIECE_ROOK;
+                break;
+            case 'b':
+                promotion = PIECE_BISHOP;
+                break;
+            default:
+                STORM_ASSERT(false, "Invalid promotion type: {}", promotionChar);
+                break;
+            }
+        }
+        if (position.GetPieceOnSquare(CreateSquare(startFile, startRank)) == PIECE_KING && startFile == FILE_E && (endFile == FILE_C || endFile == FILE_G))
+        {
+            return CreateMove(CreateSquare(startFile, startRank), CreateSquare(endFile, endRank), CASTLE);
+        }
+        return CreateMove(CreateSquare(startFile, startRank), CreateSquare(endFile, endRank));
     }
 
 }

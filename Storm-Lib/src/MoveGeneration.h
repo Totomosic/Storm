@@ -1,9 +1,12 @@
 #pragma once
 #include "Position.h"
 #include "Move.h"
+#include "Attacks.h"
 
 namespace Storm
 {
+
+	constexpr int MAX_MOVES = 218;
 
 	enum GenerationType
 	{
@@ -12,11 +15,9 @@ namespace Storm
 		ALL = CAPTURES | QUIETS,
 	};
 
-	using MoveType = Move;
-
 	namespace Internal
 	{
-		inline MoveType* AddMoves(BitBoard moves, SquareIndex fromSquare, MoveType* moveList)
+		inline Move* AddMoves(BitBoard moves, SquareIndex fromSquare, Move* moveList)
 		{
 			while (moves)
 			{
@@ -27,7 +28,7 @@ namespace Storm
 		}
 
 		template<Color C, GenerationType TYPE>
-		inline MoveType* GeneratePawnMoves(const Position& position, MoveType* moveList)
+		inline Move* GeneratePawnMoves(const Position& position, Move* moveList)
 		{
 			constexpr Direction Up = C == COLOR_WHITE ? NORTH : SOUTH;
 			constexpr BitBoard PromotionMask = RANK_MASKS[GetPromotionRank(C)];
@@ -79,7 +80,7 @@ namespace Storm
 		}
 
 		template<Color C, GenerationType TYPE, Piece PIECE>
-		inline MoveType* GenerateMoves(const Position& position, MoveType* moveList)
+		inline Move* GenerateMoves(const Position& position, Move* moveList)
 		{
 			static_assert(PIECE == PIECE_KNIGHT || PIECE == PIECE_BISHOP || PIECE == PIECE_ROOK || PIECE == PIECE_QUEEN);
 			BitBoard targetMask = ((TYPE & QUIETS) ? ~position.GetPieces(C) : ZERO_BB) | ((TYPE & CAPTURES) ? position.GetPieces(OtherColor(C)) : ZERO_BB);
@@ -105,7 +106,7 @@ namespace Storm
 		}
 
 		template<Color C, GenerationType TYPE>
-		inline MoveType* GenerateKingMoves(const Position& position, MoveType* moveList)
+		inline Move* GenerateKingMoves(const Position& position, Move* moveList)
 		{
 			constexpr Rank CastleRank = C == COLOR_WHITE ? RANK_1 : RANK_8;
 			BitBoard targetMask = ((TYPE & QUIETS) ? ~position.GetPieces(C) : ZERO_BB) | ((TYPE & CAPTURES) ? position.GetPieces(OtherColor(C)) : ZERO_BB);
@@ -118,11 +119,11 @@ namespace Storm
 				// Does check that the squares between king and rook are empty
 				if (position.Colors[C].CastleKingSide && !position.SquareOccupied(CreateSquare(FILE_F, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_G, CastleRank)))
 				{
-					*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), CreateSquare(FILE_G, CastleRank));
+					*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), CreateSquare(FILE_G, CastleRank), CASTLE);
 				}
 				if (position.Colors[C].CastleQueenSide && !position.SquareOccupied(CreateSquare(FILE_D, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_C, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_B, CastleRank)))
 				{
-					*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), CreateSquare(FILE_C, CastleRank));
+					*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), CreateSquare(FILE_C, CastleRank), CASTLE);
 				}
 			}
 			return moveList;
@@ -131,7 +132,7 @@ namespace Storm
 
 	// Generate all Pseudo-legal moves according to given GenerationType
 	template<Color C, GenerationType TYPE, Piece PIECE>
-	inline MoveType* Generate(const Position& position, MoveType* moveList)
+	inline Move* Generate(const Position& position, Move* moveList)
 	{
 		if constexpr (PIECE == PIECE_PAWN)
 		{
@@ -148,7 +149,7 @@ namespace Storm
 	}
 
 	template<Color C, GenerationType TYPE>
-	inline MoveType* GenerateAll(const Position& position, MoveType* moveList)
+	inline Move* GenerateAll(const Position& position, Move* moveList)
 	{
 		moveList = Generate<C, TYPE, PIECE_PAWN>(position, moveList);
 		moveList = Generate<C, TYPE, PIECE_KNIGHT>(position, moveList);
