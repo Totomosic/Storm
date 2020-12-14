@@ -20,6 +20,8 @@ namespace Storm
 
 			SquareIndex KingSquare[COLOR_MAX];
 			BitBoard CheckedBy[COLOR_MAX];
+			// Squares that if a piece moves to will give check
+			BitBoard CheckSquares[COLOR_MAX][PIECE_COUNT];
 
 			BitBoard BlockersForKing[COLOR_MAX];
 			BitBoard Pinners[COLOR_MAX];
@@ -46,6 +48,8 @@ namespace Storm
 		PositionCache Cache;
 
 	public:
+		void Initialize();
+
 		inline BitBoard GetPieces() const { return Cache.AllPieces; }
 		inline BitBoard GetPieces(Piece p0) const { return GetPieces(COLOR_WHITE, p0) | GetPieces(COLOR_BLACK, p0); }
 		inline BitBoard GetPieces(Piece p0, Piece p1) const { return GetPieces(p0) | GetPieces(p1); }
@@ -58,6 +62,7 @@ namespace Storm
 		inline Piece GetPieceOnSquare(SquareIndex square) const { return Cache.PieceOnSquare[square]; }
 		inline Color GetColorAt(SquareIndex square) const { return (GetPieces(COLOR_WHITE) & square) ? COLOR_WHITE : COLOR_BLACK; }
 		inline bool SquareOccupied(SquareIndex square) const { return GetPieceOnSquare(square) != PIECE_NONE; }
+		inline BitBoard GetBlockersForKing(Color color) const { return Cache.BlockersForKing[color]; }
 
 		inline bool InCheck() const { return Cache.CheckedBy[ColorToMove] != ZERO_BB; }
 
@@ -68,12 +73,18 @@ namespace Storm
 		inline Piece GetMovingPiece(Move move) const { return GetPieceOnSquare(GetFromSquare(move)); }
 		inline Piece GetCapturedPiece(Move move) const { return GetPieceOnSquare(GetToSquare(move)); }
 
-		void ApplyMove(Move move);
+		bool GivesCheck(Move move) const;
+		void ApplyMove(Move move, bool givesCheck);
+		bool IsLegal(Move move) const;
+		BitBoard GetSliderBlockers(BitBoard sliders, SquareIndex toSquare, BitBoard* pinners) const;
+		BitBoard GetAttackersTo(SquareIndex square, Color by, BitBoard blockers) const;
 
 	private:
 		void MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to);
 		void AddPiece(Color color, Piece piece, SquareIndex square);
 		void RemovePiece(Color color, Piece piece, SquareIndex square);
+
+		void UpdateCheckInfo(Color color);
 	};
 
 	Position CreateStartingPosition();

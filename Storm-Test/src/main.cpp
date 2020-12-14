@@ -1,86 +1,11 @@
 #define CATCH_CONFIG_MAIN
-#include "catch.hpp"
+#include "catch2/catch_all.hpp"
 #include "Storm.h"
 
 namespace Test
 {
 
 	using namespace Storm;
-
-	TEST_CASE("SquareFromAlgebraic", "[SquareFromAlgebraic]")
-	{
-		REQUIRE(SquareFromAlgebraic("a1") == Square{ FILE_A, RANK_1 });
-		REQUIRE(SquareFromAlgebraic("b1") == Square{ FILE_B, RANK_1 });
-		REQUIRE(SquareFromAlgebraic("c1") == Square{ FILE_C, RANK_1 });
-		REQUIRE(SquareFromAlgebraic("d1") == Square{ FILE_D, RANK_1 });
-		REQUIRE(SquareFromAlgebraic("e1") == Square{ FILE_E, RANK_1 });
-		REQUIRE(SquareFromAlgebraic("f1") == Square{ FILE_F, RANK_1 });
-		REQUIRE(SquareFromAlgebraic("g1") == Square{ FILE_G, RANK_1 });
-		REQUIRE(SquareFromAlgebraic("h1") == Square{ FILE_H, RANK_1 });
-
-		REQUIRE(SquareFromAlgebraic("a2") == Square{ FILE_A, RANK_2 });
-		REQUIRE(SquareFromAlgebraic("b2") == Square{ FILE_B, RANK_2 });
-		REQUIRE(SquareFromAlgebraic("c2") == Square{ FILE_C, RANK_2 });
-		REQUIRE(SquareFromAlgebraic("d2") == Square{ FILE_D, RANK_2 });
-		REQUIRE(SquareFromAlgebraic("e2") == Square{ FILE_E, RANK_2 });
-		REQUIRE(SquareFromAlgebraic("f2") == Square{ FILE_F, RANK_2 });
-		REQUIRE(SquareFromAlgebraic("g2") == Square{ FILE_G, RANK_2 });
-		REQUIRE(SquareFromAlgebraic("h2") == Square{ FILE_H, RANK_2 });
-
-		REQUIRE(SquareFromAlgebraic("a3") == Square{ FILE_A, RANK_3 });
-		REQUIRE(SquareFromAlgebraic("b3") == Square{ FILE_B, RANK_3 });
-		REQUIRE(SquareFromAlgebraic("c3") == Square{ FILE_C, RANK_3 });
-		REQUIRE(SquareFromAlgebraic("d3") == Square{ FILE_D, RANK_3 });
-		REQUIRE(SquareFromAlgebraic("e3") == Square{ FILE_E, RANK_3 });
-		REQUIRE(SquareFromAlgebraic("f3") == Square{ FILE_F, RANK_3 });
-		REQUIRE(SquareFromAlgebraic("g3") == Square{ FILE_G, RANK_3 });
-		REQUIRE(SquareFromAlgebraic("h3") == Square{ FILE_H, RANK_3 });
-
-		REQUIRE(SquareFromAlgebraic("a4") == Square{ FILE_A, RANK_4 });
-		REQUIRE(SquareFromAlgebraic("b4") == Square{ FILE_B, RANK_4 });
-		REQUIRE(SquareFromAlgebraic("c4") == Square{ FILE_C, RANK_4 });
-		REQUIRE(SquareFromAlgebraic("d4") == Square{ FILE_D, RANK_4 });
-		REQUIRE(SquareFromAlgebraic("e4") == Square{ FILE_E, RANK_4 });
-		REQUIRE(SquareFromAlgebraic("f4") == Square{ FILE_F, RANK_4 });
-		REQUIRE(SquareFromAlgebraic("g4") == Square{ FILE_G, RANK_4 });
-		REQUIRE(SquareFromAlgebraic("h4") == Square{ FILE_H, RANK_4 });
-
-		REQUIRE(SquareFromAlgebraic("a5") == Square{ FILE_A, RANK_5 });
-		REQUIRE(SquareFromAlgebraic("b5") == Square{ FILE_B, RANK_5 });
-		REQUIRE(SquareFromAlgebraic("c5") == Square{ FILE_C, RANK_5 });
-		REQUIRE(SquareFromAlgebraic("d5") == Square{ FILE_D, RANK_5 });
-		REQUIRE(SquareFromAlgebraic("e5") == Square{ FILE_E, RANK_5 });
-		REQUIRE(SquareFromAlgebraic("f5") == Square{ FILE_F, RANK_5 });
-		REQUIRE(SquareFromAlgebraic("g5") == Square{ FILE_G, RANK_5 });
-		REQUIRE(SquareFromAlgebraic("h5") == Square{ FILE_H, RANK_5 });
-
-		REQUIRE(SquareFromAlgebraic("a6") == Square{ FILE_A, RANK_6 });
-		REQUIRE(SquareFromAlgebraic("b6") == Square{ FILE_B, RANK_6 });
-		REQUIRE(SquareFromAlgebraic("c6") == Square{ FILE_C, RANK_6 });
-		REQUIRE(SquareFromAlgebraic("d6") == Square{ FILE_D, RANK_6 });
-		REQUIRE(SquareFromAlgebraic("e6") == Square{ FILE_E, RANK_6 });
-		REQUIRE(SquareFromAlgebraic("f6") == Square{ FILE_F, RANK_6 });
-		REQUIRE(SquareFromAlgebraic("g6") == Square{ FILE_G, RANK_6 });
-		REQUIRE(SquareFromAlgebraic("h6") == Square{ FILE_H, RANK_6 });
-
-		REQUIRE(SquareFromAlgebraic("a7") == Square{ FILE_A, RANK_7 });
-		REQUIRE(SquareFromAlgebraic("b7") == Square{ FILE_B, RANK_7 });
-		REQUIRE(SquareFromAlgebraic("c7") == Square{ FILE_C, RANK_7 });
-		REQUIRE(SquareFromAlgebraic("d7") == Square{ FILE_D, RANK_7 });
-		REQUIRE(SquareFromAlgebraic("e7") == Square{ FILE_E, RANK_7 });
-		REQUIRE(SquareFromAlgebraic("f7") == Square{ FILE_F, RANK_7 });
-		REQUIRE(SquareFromAlgebraic("g7") == Square{ FILE_G, RANK_7 });
-		REQUIRE(SquareFromAlgebraic("h7") == Square{ FILE_H, RANK_7 });
-
-		REQUIRE(SquareFromAlgebraic("a8") == Square{ FILE_A, RANK_8 });
-		REQUIRE(SquareFromAlgebraic("b8") == Square{ FILE_B, RANK_8 });
-		REQUIRE(SquareFromAlgebraic("c8") == Square{ FILE_C, RANK_8 });
-		REQUIRE(SquareFromAlgebraic("d8") == Square{ FILE_D, RANK_8 });
-		REQUIRE(SquareFromAlgebraic("e8") == Square{ FILE_E, RANK_8 });
-		REQUIRE(SquareFromAlgebraic("f8") == Square{ FILE_F, RANK_8 });
-		REQUIRE(SquareFromAlgebraic("g8") == Square{ FILE_G, RANK_8 });
-		REQUIRE(SquareFromAlgebraic("h8") == Square{ FILE_H, RANK_8 });
-	}
 
 	TEST_CASE("ZobristHash", "[Hash]")
 	{
@@ -91,24 +16,24 @@ namespace Test
 		uint64_t startingHash = hash.Hash;
 		uint64_t currentHash = startingHash;
 
-		hash.AddCastleKingside(TEAM_WHITE);
+		hash.AddCastleKingside(COLOR_WHITE);
 		REQUIRE(hash.Hash != currentHash);
-		hash.RemoveCastleKingside(TEAM_WHITE);
+		hash.RemoveCastleKingside(COLOR_WHITE);
 		REQUIRE(hash.Hash == currentHash);
 
-		hash.AddCastleKingside(TEAM_BLACK);
+		hash.AddCastleKingside(COLOR_BLACK);
 		REQUIRE(hash.Hash != currentHash);
-		hash.RemoveCastleKingside(TEAM_BLACK);
+		hash.RemoveCastleKingside(COLOR_BLACK);
 		REQUIRE(hash.Hash == currentHash);
 
-		hash.AddCastleQueenside(TEAM_WHITE);
+		hash.AddCastleQueenside(COLOR_WHITE);
 		REQUIRE(hash.Hash != currentHash);
-		hash.RemoveCastleQueenside(TEAM_WHITE);
+		hash.RemoveCastleQueenside(COLOR_WHITE);
 		REQUIRE(hash.Hash == currentHash);
 
-		hash.AddCastleQueenside(TEAM_BLACK);
+		hash.AddCastleQueenside(COLOR_BLACK);
 		REQUIRE(hash.Hash != currentHash);
-		hash.RemoveCastleQueenside(TEAM_BLACK);
+		hash.RemoveCastleQueenside(COLOR_BLACK);
 		REQUIRE(hash.Hash == currentHash);
 
 		hash.AddEnPassant(FILE_A);
@@ -156,7 +81,7 @@ namespace Test
 	{
 		Init();
 		Position position = CreateStartingPosition();
-		Search search(50 * 1024, false);
+		Search search;
 
 		size_t checks = 0;
 
@@ -225,7 +150,7 @@ namespace Test
 		REQUIRE(search.Perft(position, 5) == 164075551);
 	}
 
-	TEST_CASE("Transposition", "[Transposition]")
+	/*TEST_CASE("Transposition", "[Transposition]")
 	{
 		TranspositionTable tt;
 
@@ -276,39 +201,34 @@ namespace Test
 		REQUIRE(tte.GetFlag() == EXACT);
 		REQUIRE(tte.GetAge() == 22);
 		REQUIRE(tte.IsPv() == true);
-	}
+	}*/
 
 	TEST_CASE("Checks", "[Check]")
 	{
 		Init();
 		Position position = CreatePositionFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 
-		REQUIRE(position.InCheck(TEAM_WHITE) == false);
-		REQUIRE(position.InCheck(TEAM_BLACK) == false);
+		REQUIRE(position.InCheck() == false);
 
 		position = CreatePositionFromFEN("rnbqkbnr/ppppQppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 
-		REQUIRE(position.InCheck(TEAM_WHITE) == false);
-		REQUIRE(position.InCheck(TEAM_BLACK) == true);
+		REQUIRE(position.InCheck() == false);
 
 		position = CreatePositionFromFEN("rnbqkbnr/ppppQppp/8/8/8/8/PPPPrPPP/RNBQKBNR w KQkq - 0 1");
 
-		REQUIRE(position.InCheck(TEAM_WHITE) == true);
-		REQUIRE(position.InCheck(TEAM_BLACK) == true);
+		REQUIRE(position.InCheck() == true);
 
 		position = CreatePositionFromFEN("rnbqkbnr/pppppppp/8/1B6/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1");
 
-		REQUIRE(position.InCheck(TEAM_WHITE) == false);
-		REQUIRE(position.InCheck(TEAM_BLACK) == false);
+		REQUIRE(position.InCheck() == false);
 
 		Move move = UCI::CreateMoveFromString(position, "b5d7");
-		ApplyMove(position, move);
+		position.ApplyMove(move, position.GivesCheck(move));
 
-		REQUIRE(position.InCheck(TEAM_WHITE) == false);
-		REQUIRE(position.InCheck(TEAM_BLACK) == true);
+		REQUIRE(position.InCheck() == true);
 	}
 
-	TEST_CASE("Mirror", "[Evaluation]")
+	/*TEST_CASE("Mirror", "[Evaluation]")
 	{
 		Init();
 
@@ -371,6 +291,6 @@ namespace Test
 		Position position = CreatePositionFromFEN("r2q3k/p2P3p/1p3p2/3QP1r1/8/B7/P5PP/2R3K1 w - -");
 		Move move = PGN::CreateMoveFromString(position, "Qxa8");
 		REQUIRE(move != MOVE_NONE);
-	}
+	}*/
 
 }

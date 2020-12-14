@@ -1,26 +1,22 @@
 #include "Storm.h"
+#include "CommandManager.h"
 
 using namespace Storm;
 
 int main()
 {
 	Init();
+	std::string version = __TIMESTAMP__;
 
-	Position position = CreateStartingPosition();//CreatePositionFromFEN("8/3kb3/6Q1/p3B3/6p1/2PP1q2/P4PKP/8 w - - 17 37");
+	std::cout << "Storm " << version << " by J. Morrison" << std::endl;
 
-	std::cout << position << std::endl;
+	CommandManager commands;
 
-	Move moves[255];
-	Move* end = GenerateAll<COLOR_WHITE, ALL>(position, moves);
-
-	Move* start = moves;
-	while (start != end)
+	char buffer[8192];
+	while (true)
 	{
-		std::cout << UCI::FormatMove(*start++) << std::endl;
+		std::cin.getline(buffer, sizeof(buffer));
+		commands.ExecuteCommand(buffer);
 	}
-
-	position.ApplyMove(moves[19]);
-	std::cout << position << std::endl;
-
 	return 0;
 }
