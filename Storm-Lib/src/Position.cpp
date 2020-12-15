@@ -54,9 +54,14 @@ namespace Storm
 		Hash.SetFromPosition(*this);
 	}
 
-	void Position::ApplyMove(Move move, bool givesCheck)
+	void Position::ApplyMove(Move move, UndoInfo* undo)
 	{
-		STORM_ASSERT(move != MOVE_NONE, "Invalid move");
+		return ApplyMove(move, undo, GivesCheck(move));
+	}
+
+	void Position::ApplyMove(Move move, UndoInfo* undo, bool givesCheck)
+	{
+		STORM_ASSERT(ValidMove(move), "Invalid move");
 		const SquareIndex fromSquare = GetFromSquare(move);
 		const SquareIndex toSquare = GetToSquare(move);
 		const Rank fromRank = RankOf(fromSquare);
@@ -65,11 +70,12 @@ namespace Storm
 		const File toFile = FileOf(toSquare);
 		const Piece movingPiece = GetMovingPiece(move);
 		const Piece capturedPiece = GetCapturedPiece(move);
-		const bool isPromotion = movingPiece == PIECE_PAWN && toRank == GetPromotionRank(ColorToMove);
+		const bool isPromotion = GetMoveType(move) == PROMOTION;
 		const bool isCapture = capturedPiece != PIECE_NONE;
 		const bool isCastle = GetMoveType(move) == CASTLE;
 		const bool isEnpassant = movingPiece == PIECE_PAWN && toSquare == EnpassantSquare;
 		const Color otherColor = OtherColor(ColorToMove);
+		const Rank otherBackRank = otherColor == COLOR_WHITE ? RANK_1 : RANK_8;
 
 		if (EnpassantSquare != SQUARE_INVALID)
 		{
@@ -83,7 +89,7 @@ namespace Storm
 			RemovePiece(otherColor, capturedPiece, toSquare);
 			RemovePiece(ColorToMove, movingPiece, fromSquare);
 			AddPiece(ColorToMove, promotionPiece, toSquare);
-			if (capturedPiece == PIECE_ROOK)
+			if (capturedPiece == PIECE_ROOK && toRank == otherBackRank)
 			{
 				if (toFile == FILE_A && Colors[otherColor].CastleQueenSide)
 				{
@@ -101,7 +107,7 @@ namespace Storm
 		{
 			RemovePiece(otherColor, capturedPiece, toSquare);
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
-			if (capturedPiece == PIECE_ROOK)
+			if (capturedPiece == PIECE_ROOK && toRank == otherBackRank)
 			{
 				if (toFile == FILE_A && Colors[otherColor].CastleQueenSide)
 				{
@@ -206,8 +212,14 @@ namespace Storm
 		Hash.FlipTeamToPlay();
 	}
 
+	void Position::UndoMove(const UndoInfo& undo)
+	{
+	
+	}
+
 	bool Position::GivesCheck(Move move) const
 	{
+		STORM_ASSERT(ValidMove(move), "Invalid move");
 		SquareIndex fromSquare = GetFromSquare(move);
 		SquareIndex toSquare = GetToSquare(move);
 		Piece movingPiece = GetPieceOnSquare(fromSquare);
@@ -220,6 +232,9 @@ namespace Storm
 		if (GetBlockersForKing(OtherColor(ColorToMove)) & fromSquare && !IsAligned(fromSquare, toSquare, GetKingSquare(OtherColor(ColorToMove))))
 			return true;
 
+		if (GetMoveType(move) == PROMOTION)
+			return GetAttacksDynamic(GetPromotionPiece(move), toSquare, GetPieces() ^ fromSquare) & GetKingSquare(OtherColor(ColorToMove));
+
 		if (movingPiece == PIECE_PAWN && toSquare == EnpassantSquare)
 		{
 			SquareIndex capturedSquare = GetEnpassantSquare(toSquare, ColorToMove);
@@ -229,12 +244,12 @@ namespace Storm
 					(GetAttacks<PIECE_ROOK>(GetKingSquare(OtherColor(ColorToMove)), blockers) & GetPieces(ColorToMove, PIECE_ROOK, PIECE_QUEEN)));
 		}
 
-		if (movingPiece == PIECE_KING)
+		if (GetMoveType(move) == CASTLE)
 		{
 			File fromFile = FileOf(fromSquare);
 			Rank fromRank = RankOf(fromSquare);
 			File toFile = FileOf(toSquare);
-			if (fromFile == FILE_E && toFile == FILE_G)
+			if (toFile == FILE_G)
 			{
 				// Kingside castle
 				SquareIndex rookFrom = CreateSquare(FILE_H, fromRank);
@@ -242,7 +257,7 @@ namespace Storm
 				return GetAttacks<PIECE_ROOK>(rookTo, (GetPieces() ^ rookFrom ^ fromSquare) | toSquare | rookTo) & GetKingSquare(OtherColor(ColorToMove));
 
 			}
-			else if (fromFile == FILE_E && toFile == FILE_C)
+			else
 			{
 				// Queenside castle
 				SquareIndex rookFrom = CreateSquare(FILE_A, fromRank);

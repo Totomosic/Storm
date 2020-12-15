@@ -8,6 +8,7 @@ namespace Storm
 		InitRays();
 		InitAttacks();
 		InitZobristHash();
+		InitEvaluation();
 	}
 
 }

@@ -60,7 +60,11 @@ namespace Storm
     {
         SquareIndex from = GetFromSquare(move);
         SquareIndex to = GetToSquare(move);
-        return SquareToString(from) + SquareToString(to);
+        Piece promotion = GetPromotionPiece(move);
+        std::string result = SquareToString(from) + SquareToString(to);
+        if (promotion != PIECE_NONE && GetMoveType(move) == PROMOTION)
+            result += PieceToString(promotion, COLOR_BLACK);
+        return result;
     }
 
     Move UCI::CreateMoveFromString(const Position& position, const std::string& uciString)
@@ -70,7 +74,7 @@ namespace Storm
         Rank startRank = Rank(uciString[1] - '1');
         File endFile = File(uciString[2] - 'a');
         Rank endRank = Rank(uciString[3] - '1');
-        Piece promotion = PIECE_QUEEN;
+        Piece promotion = PIECE_NONE;
         if (uciString.size() >= 5)
         {
             // support lower case or upper case
@@ -97,9 +101,9 @@ namespace Storm
             }
         }
         if (position.GetPieceOnSquare(CreateSquare(startFile, startRank)) == PIECE_KING && startFile == FILE_E && (endFile == FILE_C || endFile == FILE_G))
-        {
             return CreateMove(CreateSquare(startFile, startRank), CreateSquare(endFile, endRank), CASTLE);
-        }
+        if (promotion != PIECE_NONE && endRank == GetPromotionRank(position.ColorToMove))
+            return CreateMove(CreateSquare(startFile, startRank), CreateSquare(endFile, endRank), promotion);
         return CreateMove(CreateSquare(startFile, startRank), CreateSquare(endFile, endRank));
     }
 
