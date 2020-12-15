@@ -159,7 +159,7 @@ namespace Storm
 
 	inline int Popcount(BitBoard board)
 	{
-		return int(__popcnt64(board));
+		return int(__builtin_popcountll(board));
 	}
 #endif
 

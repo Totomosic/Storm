@@ -12,8 +12,8 @@ project "Storm-Test"
     {
         "src/**.h",
         "src/**.cpp",
-        "%{StormIncludeDirs.Catch}include/**.hpp",
-        "%{StormIncludeDirs.Catch}include/**.cpp"
+        "vendor/Catch2/catch_amalgamated.hpp",
+        "vendor/Catch2/catch_amalgamated.cpp"
     }
     
     includedirs

@@ -1,11 +1,13 @@
 #pragma once
-#include "Position.h"
+#include "Attacks.h"
+#include "EvalConstants.h"
+#include "Evaluation.h"
 #include "Format.h"
 #include "Move.h"
-#include "EvalConstants.h"
-#include "Attacks.h"
 #include "MoveGeneration.h"
+#include "Position.h"
 #include "Search.h"
+
 
 namespace Storm
 {

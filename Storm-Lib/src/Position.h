@@ -8,6 +8,12 @@
 namespace Storm
 {
 
+	struct UndoInfo
+	{
+	public:
+		SquareIndex EnpassantSquare;
+	};
+
 	class STORM_API Position
 	{
 	public:
@@ -74,7 +80,9 @@ namespace Storm
 		inline Piece GetCapturedPiece(Move move) const { return GetPieceOnSquare(GetToSquare(move)); }
 
 		bool GivesCheck(Move move) const;
-		void ApplyMove(Move move, bool givesCheck);
+		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);
+		void ApplyMove(Move move, UndoInfo* undo);
+		void UndoMove(const UndoInfo& undo);
 		bool IsLegal(Move move) const;
 		BitBoard GetSliderBlockers(BitBoard sliders, SquareIndex toSquare, BitBoard* pinners) const;
 		BitBoard GetAttackersTo(SquareIndex square, Color by, BitBoard blockers) const;

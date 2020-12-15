@@ -261,6 +261,7 @@ namespace Storm
 	void CommandManager::ApplyMoves(const std::vector<std::string>& moves)
 	{
 		Move moveBuffer[MAX_MOVES];
+		UndoInfo undo;
 		if (!m_Searching)
 		{
 			for (const std::string& moveString : moves)
@@ -281,7 +282,7 @@ namespace Storm
 					{
 						if (m_CurrentPosition.IsLegal(move))
 						{
-							m_CurrentPosition.ApplyMove(move, m_CurrentPosition.GivesCheck(move));
+							m_CurrentPosition.ApplyMove(move, &undo);
 							// m_Search.PushPosition(m_CurrentPosition);
 							legal = true;
 						}
@@ -300,8 +301,8 @@ namespace Storm
 
 	void CommandManager::Eval()
 	{
-		//  EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
-		// std::cout << FormatEvaluation(evaluation) << std::endl;
+		EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
+		std::cout << FormatEvaluation(evaluation) << std::endl;
 	}
 
 	void CommandManager::Perft(int depth)
@@ -316,18 +317,18 @@ namespace Storm
 	{
 		if (!m_Searching)
 		{
-			/*m_Searching = true;
+			m_Searching = true;
 			if (m_SearchThread.joinable())
 				m_SearchThread.join();
 			m_SearchThread = std::thread([this, depth, includedMoves]()
 			{
 				SearchLimits limits;
 				limits.Depth = depth;
-				limits.Only = includedMoves;
+				// limits.Only = includedMoves;
 				Move bestMove = m_Search.SearchBestMove(m_CurrentPosition, limits);
 				std::cout << "bestmove " << UCI::FormatMove(bestMove) << std::endl;
 				m_Searching = false;
-			});*/
+			});
 		}
 	}
 
@@ -335,18 +336,18 @@ namespace Storm
 	{
 		if (!m_Searching)
 		{
-			/*m_Searching = true;
+			m_Searching = true;
 			if (m_SearchThread.joinable())
 				m_SearchThread.join();
 			m_SearchThread = std::thread([this, milliseconds, includedMoves]()
 			{
 				SearchLimits limits;
 				limits.Milliseconds = milliseconds;
-				limits.Only = includedMoves;
+				// limits.Only = includedMoves;
 				Move bestMove = m_Search.SearchBestMove(m_CurrentPosition, limits);
 				std::cout << "bestmove " << UCI::FormatMove(bestMove) << std::endl;
 				m_Searching = false;
-			});*/
+			});
 		}
 	}
 
@@ -354,16 +355,16 @@ namespace Storm
 	{
 		if (!m_Searching)
 		{
-			/*m_Searching = true;
+			m_Searching = true;
 			if (m_SearchThread.joinable())
 				m_SearchThread.join();
 			m_SearchThread = std::thread([this, includedMoves]()
 			{
 				SearchLimits limits;
-				limits.Only = includedMoves;
+				// limits.Only = includedMoves;
 				m_Search.Ponder(m_CurrentPosition, limits);
 				m_Searching = false;
-			});*/
+			});
 		}
 	}
 
@@ -413,7 +414,7 @@ namespace Storm
 	{
 		if (m_Searching)
 		{
-			// m_Search.Stop();
+			m_Search.Stop();
 			m_SearchThread.join();
 		}
 	}

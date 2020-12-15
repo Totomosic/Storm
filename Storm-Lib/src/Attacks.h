@@ -107,6 +107,27 @@ namespace Storm
         return s_NonSlidingAttacks[COLOR_WHITE][PIECE][fromSquare];
     }
 
+    inline BitBoard GetAttacksDynamic(Piece piece, SquareIndex fromSquare, BitBoard blockers)
+    {
+        switch (piece)
+        {
+        case PIECE_KNIGHT:
+            return GetAttacks<PIECE_KNIGHT>(fromSquare);
+        case PIECE_KING:
+            return GetAttacks<PIECE_KING>(fromSquare);
+        case PIECE_BISHOP:
+            return GetAttacks<PIECE_BISHOP>(fromSquare, blockers);
+        case PIECE_ROOK:
+            return GetAttacks<PIECE_ROOK>(fromSquare, blockers);
+        case PIECE_QUEEN:
+            return GetAttacks<PIECE_QUEEN>(fromSquare, blockers);
+        default:
+            STORM_ASSERT(false, "Invalid piece type");
+            break;
+        }
+        return ZERO_BB;
+    }
+
     template<Color C>
     inline constexpr BitBoard GetPawnAttacks(BitBoard pawns)
     {

@@ -7,7 +7,8 @@ namespace Storm
 	STORM_API enum MoveType : uint8_t
 	{
 		NORMAL = 0,
-		CASTLE = 1 << 0,
+		CASTLE,
+		PROMOTION,
 	};
 
 	STORM_API enum Move : uint16_t
@@ -22,12 +23,12 @@ namespace Storm
 
 	constexpr Move CreateMove(SquareIndex from, SquareIndex to, Piece promotion)
 	{
-		return Move((from & 0x3F) | ((to & 0x3F) << 6) | (((promotion - PIECE_KNIGHT) & 0x3) << 12));
+		return Move((from & 0x3F) | ((to & 0x3F) << 6) | (((promotion - PIECE_KNIGHT) & 0x3) << 12) | ((PROMOTION & 0x3) << 14));
 	}
 
 	constexpr Move CreateMove(SquareIndex from, SquareIndex to, MoveType type)
 	{
-		return Move((from & 0x3F) | ((to & 0x3F) << 6) | ((type & 0x1) << 15));
+		return Move((from & 0x3F) | ((to & 0x3F) << 6) | ((type & 0x3) << 14));
 	}
 
 	constexpr SquareIndex GetFromSquare(Move move)
@@ -42,12 +43,17 @@ namespace Storm
 
 	constexpr Piece GetPromotionPiece(Move move)
 	{
-		return Piece((move >> 12) & 0x3 + PIECE_KNIGHT);
+		return Piece(((move >> 12) & 0x3) + PIECE_KNIGHT);
 	}
 	
 	constexpr MoveType GetMoveType(Move move)
 	{
-		return MoveType((move >> 15) & 0x1);
+		return MoveType((move >> 14) & 0x3);
+	}
+
+	constexpr bool ValidMove(Move move)
+	{
+		return GetFromSquare(move) != GetToSquare(move);
 	}
 
 }

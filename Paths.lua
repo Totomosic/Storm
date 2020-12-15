@@ -10,7 +10,7 @@ StormBookDir = "Storm-Book/"
 StormIncludeDirs = {}
 StormIncludeDirs["spdlog"] =     StormLibDir .. "vendor/spdlog/include/"
 StormIncludeDirs["Storm"] =      StormLibDir .. "src/"
-StormIncludeDirs["Catch"] =      StormTestDir .. "vendor/Catch2/src/"
+StormIncludeDirs["Catch"] =      StormTestDir .. "vendor/Catch2/"
 
 -- Library directories relative to solution directory
 LibraryDirs = {}

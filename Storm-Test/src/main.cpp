@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#include "catch2/catch_all.hpp"
+#include "catch_amalgamated.hpp"
 #include "Storm.h"
 
 namespace Test
@@ -81,7 +81,7 @@ namespace Test
 	{
 		Init();
 		Position position = CreateStartingPosition();
-		Search search;
+		Search search(false);
 
 		size_t checks = 0;
 
