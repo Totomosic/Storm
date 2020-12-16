@@ -81,7 +81,7 @@ namespace Test
 	{
 		Init();
 		Position position = CreateStartingPosition();
-		Search search(false);
+		Search search(50 * 1024 * 1024, false);
 
 		size_t checks = 0;
 
@@ -222,8 +222,9 @@ namespace Test
 
 		REQUIRE(position.InCheck() == false);
 
+		UndoInfo undo;
 		Move move = UCI::CreateMoveFromString(position, "b5d7");
-		position.ApplyMove(move, position.GivesCheck(move));
+		position.ApplyMove(move, &undo);
 
 		REQUIRE(position.InCheck() == true);
 	}

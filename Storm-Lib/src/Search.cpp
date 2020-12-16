@@ -11,8 +11,8 @@ namespace Storm
         *pv = MOVE_NONE;
     }
 
-    Search::Search(bool log)
-        : m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_StartRootTime(), m_StartSearchTime(), m_Stopped(false), m_ShouldStop(false)
+    Search::Search(size_t ttSize, bool log)
+        : m_TranspositionTable(ttSize), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_StartRootTime(), m_StartSearchTime(), m_Stopped(false), m_ShouldStop(false)
     {
     }
 
@@ -189,7 +189,7 @@ namespace Storm
         pv[0] = MOVE_NONE;
         (stack + 1)->PV = pv;
 
-        ValueType orignalAlpha = alpha;
+        ValueType originalAlpha = alpha;
 
         if (stack->Ply > selDepth)
             selDepth = stack->Ply;
@@ -199,6 +199,26 @@ namespace Storm
 
         if (depth <= 0)
             return QuiescenceSearch<NT>(position, stack, depth, alpha, beta, cutNode);
+
+        bool ttHit;
+        ZobristHash ttHash = position.Hash;
+        TranspositionTableEntry* ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
+
+        ValueType ttValue = ttHit ? ttEntry->GetValue() : VALUE_NONE;
+        Move ttMove = ttHit ? ttEntry->GetMove() : MOVE_NONE;
+
+        if (!IsRoot && ttHit && ttEntry->GetDepth() >= depth)
+        {
+            EntryBound bound = ttEntry->GetBound();
+            if (bound == BOUND_EXACT)
+                return ttValue;
+            if (bound & BOUND_LOWER)
+                alpha = std::max(ttValue, alpha);
+            else if (bound & BOUND_UPPER)
+                beta = std::min(beta, ttValue);
+            if (alpha >= beta)
+                return alpha;
+        }
 
         Move moves[MAX_MOVES];
         Move* it = moves;
@@ -210,6 +230,7 @@ namespace Storm
             end = GenerateAll<COLOR_BLACK, ALL>(position, moves);
 
         ValueType bestValue = -VALUE_MATE;
+        Move bestMove = MOVE_NONE;
         int moveIndex = 0;
 
         while (it != end)
@@ -249,6 +270,7 @@ namespace Storm
                 if (value > bestValue)
                 {
                     bestValue = value;
+                    bestMove = *it;
                     if (value > alpha)
                     {
                         alpha = value;
@@ -257,7 +279,10 @@ namespace Storm
                     }
                 }
                 if (value >= beta)
+                {
+                    ttEntry->Update(ttHash, *it, depth, BOUND_LOWER, value);
                     return value;
+                }
             }
             ++it;
         }
@@ -268,6 +293,8 @@ namespace Storm
                 return MatedIn(stack->Ply);
             return VALUE_DRAW;
         }
+
+        ttEntry->Update(ttHash, bestMove, depth, alpha > originalAlpha ? BOUND_EXACT : BOUND_UPPER, bestValue);
 
         return bestValue;
     }
@@ -306,9 +333,9 @@ namespace Storm
         if (inCheck)
         {
             if (position.ColorToMove == COLOR_WHITE)
-                end = GenerateAll<COLOR_WHITE, ALL>(position, moves);
+                end = GenerateAll<COLOR_WHITE, CAPTURES | EVASIONS>(position, moves);
             else
-                end = GenerateAll<COLOR_BLACK, ALL>(position, moves);
+                end = GenerateAll<COLOR_BLACK, CAPTURES | EVASIONS>(position, moves);
         }
         else
         {

@@ -22,6 +22,15 @@ namespace Storm
 	constexpr int QueenStageWeight = 6;
 	constexpr int KingStageWeight = 0;
 
+	constexpr int GameStageWeights[PIECE_COUNT] = {
+		PawnStageWeight,
+		KnightStageWeight,
+		BishopStageWeight,
+		RookStageWeight,
+		QueenStageWeight,
+		KingStageWeight,
+	};
+
 	constexpr int GameStageMax = 16 * PawnStageWeight + 4 * KnightStageWeight + 4 * BishopStageWeight + 4 * RookStageWeight + 2 * QueenStageWeight + 2 * KingStageWeight;
 
 	constexpr ValueType VALUE_MATE = 100000;
@@ -186,7 +195,7 @@ namespace Storm
 		494, 500, 500, 500, 500, 500, 500, 500, 500, 500,
 		500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
 		500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-		500, 500, 500, 500, 500, 500, 500, 500, 500, 500
+		500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
 	};
 
 	constexpr int PawnAttackWeight = 0;
