@@ -45,8 +45,7 @@ namespace Storm
 		Cache.KingSquare[COLOR_BLACK] = MostSignificantBit(GetPieces(COLOR_BLACK, PIECE_KING));
 		STORM_ASSERT(Cache.KingSquare[COLOR_WHITE] != ZERO_BB && Cache.KingSquare[COLOR_BLACK] != ZERO_BB, "Couldn't find king");
 
-		Cache.CheckedBy[COLOR_WHITE] = GetAttackersTo(GetKingSquare(COLOR_WHITE), COLOR_BLACK, GetPieces());
-		Cache.CheckedBy[COLOR_BLACK] = GetAttackersTo(GetKingSquare(COLOR_BLACK), COLOR_WHITE, GetPieces());
+		Cache.CheckedBy = GetAttackersTo(GetKingSquare(ColorToMove), OtherColor(ColorToMove), GetPieces());
 
 		UpdateCheckInfo(COLOR_WHITE);
 		UpdateCheckInfo(COLOR_BLACK);
@@ -57,6 +56,23 @@ namespace Storm
 	void Position::ApplyMove(Move move, UndoInfo* undo)
 	{
 		return ApplyMove(move, undo, GivesCheck(move));
+	}
+
+	void Position::ApplyNullMove()
+	{
+		if (EnpassantSquare != SQUARE_INVALID)
+		{
+			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
+			EnpassantSquare = SQUARE_INVALID;
+		}
+		Cache.CheckedBy = ZERO_BB;
+		HalfTurnsSinceCaptureOrPush++;
+
+		if (ColorToMove == COLOR_BLACK)
+			TotalTurns++;
+
+		ColorToMove = OtherColor(ColorToMove);
+		Hash.FlipTeamToPlay();
 	}
 
 	void Position::ApplyMove(Move move, UndoInfo* undo, bool givesCheck)
@@ -195,9 +211,9 @@ namespace Storm
 			}
 		}
 
-		Cache.CheckedBy[ColorToMove] = ZERO_BB;
+		Cache.CheckedBy = ZERO_BB;
 		if (givesCheck)
-			Cache.CheckedBy[otherColor] = GetAttackersTo(GetKingSquare(otherColor), ColorToMove, GetPieces());
+			Cache.CheckedBy = GetAttackersTo(GetKingSquare(otherColor), ColorToMove, GetPieces());
 		UpdateCheckInfo(ColorToMove);
 
 		if (movingPiece == PIECE_PAWN || isCapture)
@@ -210,11 +226,6 @@ namespace Storm
 
 		ColorToMove = otherColor;
 		Hash.FlipTeamToPlay();
-	}
-
-	void Position::UndoMove(const UndoInfo& undo)
-	{
-	
 	}
 
 	bool Position::GivesCheck(Move move) const
@@ -282,16 +293,16 @@ namespace Storm
 				&& !(GetAttacks<PIECE_BISHOP>(kingSquare, occupied) & GetPieces(OtherColor(ColorToMove), PIECE_QUEEN, PIECE_BISHOP));
 		}
 
-		if (Cache.CheckedBy[ColorToMove])
+		if (Cache.CheckedBy)
 		{
 			if (GetMoveType(move) == CASTLE)
 				return false;
 			if (movingPiece != PIECE_KING)
 			{
-				if (MoreThanOne(Cache.CheckedBy[ColorToMove]))
+				if (MoreThanOne(Cache.CheckedBy))
 					return false;
-				SquareIndex checkingSquare = LeastSignificantBit(Cache.CheckedBy[ColorToMove]);
-				if (((GetBitBoardBetween(checkingSquare, kingSquare) | Cache.CheckedBy[ColorToMove]) & toSquare) == ZERO_BB)
+				SquareIndex checkingSquare = LeastSignificantBit(Cache.CheckedBy);
+				if (((GetBitBoardBetween(checkingSquare, kingSquare) | Cache.CheckedBy) & toSquare) == ZERO_BB)
 					return false;
 			}
 			else if (GetAttackersTo(toSquare, OtherColor(ColorToMove), GetPieces() ^ fromSquare))

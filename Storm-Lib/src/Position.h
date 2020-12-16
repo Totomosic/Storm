@@ -20,19 +20,29 @@ namespace Storm
 		struct STORM_API PositionCache
 		{
 		public:
+			// All Pieces owned by a certain color
 			BitBoard ColorPieces[COLOR_MAX];
+			// All Peices of a given type
 			BitBoard PiecesByType[PIECE_MAX];
+			// All pieces on board
 			BitBoard AllPieces;
 
+			// King square of given color
 			SquareIndex KingSquare[COLOR_MAX];
-			BitBoard CheckedBy[COLOR_MAX];
+			// All enemy pieces that attack the king square of the ColorToMove.
+			BitBoard CheckedBy;
 			// Squares that if a piece moves to will give check
 			BitBoard CheckSquares[COLOR_MAX][PIECE_COUNT];
 
+			// Pieces (of both colors) that if moved will cause our king to be attacked (unless moving in a line between attacker and king)
+			// BlockersForKing[COLOR_WHITE] contains pieces that block black rooks, queens and bishops from our king
 			BitBoard BlockersForKing[COLOR_MAX];
+			// Pieces that attack a piece that blocks the enemy king
 			BitBoard Pinners[COLOR_MAX];
+			// Piece type on squares - PIECE_NONE if no piece on square
 			Piece PieceOnSquare[SQUARE_MAX];
 
+			// Midgame Non pawn material
 			ValueType NonPawnMaterial[COLOR_MAX];
 		};
 
@@ -70,7 +80,8 @@ namespace Storm
 		inline bool SquareOccupied(SquareIndex square) const { return GetPieceOnSquare(square) != PIECE_NONE; }
 		inline BitBoard GetBlockersForKing(Color color) const { return Cache.BlockersForKing[color]; }
 
-		inline bool InCheck() const { return Cache.CheckedBy[ColorToMove] != ZERO_BB; }
+		inline bool InCheck() const { return Cache.CheckedBy != ZERO_BB; }
+		inline BitBoard GetCheckers() const { return Cache.CheckedBy; };
 
 		inline ValueType GetNonPawnMaterial(Color color) const { return Cache.NonPawnMaterial[color]; }
 		inline ValueType GetNonPawnMaterial() const { return GetNonPawnMaterial(COLOR_WHITE) + GetNonPawnMaterial(COLOR_BLACK); }
@@ -82,7 +93,7 @@ namespace Storm
 		bool GivesCheck(Move move) const;
 		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);
 		void ApplyMove(Move move, UndoInfo* undo);
-		void UndoMove(const UndoInfo& undo);
+		void ApplyNullMove();
 		bool IsLegal(Move move) const;
 		BitBoard GetSliderBlockers(BitBoard sliders, SquareIndex toSquare, BitBoard* pinners) const;
 		BitBoard GetAttackersTo(SquareIndex square, Color by, BitBoard blockers) const;

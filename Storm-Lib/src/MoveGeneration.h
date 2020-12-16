@@ -8,12 +8,19 @@ namespace Storm
 
 	constexpr int MAX_MOVES = 218;
 
-	enum GenerationType
+	STORM_API enum GenerationType : uint8_t
 	{
 		CAPTURES = 1 << 0,
-		QUIETS = 1 << 1,
+		EVASIONS = 1 << 1,
+		NON_EVASIONS = 1 << 2,
+		QUIETS = EVASIONS | NON_EVASIONS,
 		ALL = CAPTURES | QUIETS,
 	};
+
+	constexpr GenerationType operator|(GenerationType a, GenerationType b)
+	{
+		return GenerationType(uint8_t(a) | uint8_t(b));
+	}
 
 	namespace Internal
 	{
@@ -38,7 +45,7 @@ namespace Storm
 		}
 
 		template<Color C, GenerationType TYPE, typename MT>
-		inline MT* GeneratePawnMoves(const Position& position, MT* moveList)
+		inline MT* GeneratePawnMoves(const Position& position, BitBoard targetSquares, MT* moveList)
 		{
 			constexpr Direction Up = C == COLOR_WHITE ? NORTH : SOUTH;
 			constexpr BitBoard PromotionMask = RANK_MASKS[GetPromotionRank(C)];
@@ -47,10 +54,10 @@ namespace Storm
 			constexpr Direction AttackDir1 = C == COLOR_WHITE ? NORTH_WEST : SOUTH_WEST;
 			if constexpr (bool(TYPE & QUIETS))
 			{
-				const BitBoard available = ~position.GetPieces();
+				BitBoard availableSquares = ~position.GetPieces();
 				BitBoard pawns = position.GetPieces(C, PIECE_PAWN);
-				BitBoard singlePushes = Shift<Up>(pawns) & available;
-				BitBoard doublePushes = Shift<Up>(Shift<Up>(pawns & DoublePushPawns) & available) & available;
+				BitBoard singlePushes = Shift<Up>(pawns) & availableSquares & targetSquares;
+				BitBoard doublePushes = Shift<Up>(Shift<Up>(pawns & DoublePushPawns) & availableSquares) & availableSquares & targetSquares;
 				BitBoard promotions = singlePushes & PromotionMask;
 				singlePushes &= ~PromotionMask;
 				while (singlePushes)
@@ -75,7 +82,8 @@ namespace Storm
 			if constexpr (bool(TYPE & CAPTURES))
 			{
 				BitBoard pawns = position.GetPieces(C, PIECE_PAWN);
-				BitBoard enemies = position.GetPieces(OtherColor(C));
+				BitBoard enemies = position.GetPieces(OtherColor(C)) & targetSquares;
+				// Enpassant is rare enough that we don't care if we generate too many
 				if (position.EnpassantSquare != SQUARE_INVALID)
 					enemies |= position.EnpassantSquare;
 				while (pawns)
@@ -97,18 +105,17 @@ namespace Storm
 			return moveList;
 		}
 
-		template<Color C, GenerationType TYPE, Piece PIECE, typename MT>
-		inline MT* GenerateMoves(const Position& position, MT* moveList)
+		template<Color C, Piece PIECE, typename MT>
+		inline MT* GenerateMoves(const Position& position, BitBoard availableSquares, MT* moveList)
 		{
 			static_assert(PIECE == PIECE_KNIGHT || PIECE == PIECE_BISHOP || PIECE == PIECE_ROOK || PIECE == PIECE_QUEEN);
-			BitBoard targetMask = ((TYPE & QUIETS) ? ~position.GetPieces(C) : ZERO_BB) | ((TYPE & CAPTURES) ? position.GetPieces(OtherColor(C)) : ZERO_BB);
 			BitBoard pieces = position.GetPieces(C, PIECE);
 			if constexpr (PIECE == PIECE_KNIGHT)
 			{
 				while (pieces)
 				{
 					SquareIndex square = PopLeastSignificantBit(pieces);
-					moveList = AddMoves(GetAttacks<PIECE>(square) & targetMask, square, moveList);
+					moveList = AddMoves(GetAttacks<PIECE>(square) & availableSquares, square, moveList);
 				}
 			}
 			else
@@ -117,32 +124,33 @@ namespace Storm
 				while (pieces)
 				{
 					SquareIndex square = PopLeastSignificantBit(pieces);
-					moveList = AddMoves(GetAttacks<PIECE>(square, blockers) & targetMask, square, moveList);
+					moveList = AddMoves(GetAttacks<PIECE>(square, blockers) & availableSquares, square, moveList);
 				}
 			}
 			return moveList;
 		}
 
-		template<Color C, GenerationType TYPE, typename MT>
-		inline MT* GenerateKingMoves(const Position& position, MT* moveList)
+		template<Color C, typename MT>
+		inline MT* GenerateKingMoves(const Position& position, BitBoard availableSquares, MT* moveList)
 		{
 			constexpr Rank CastleRank = C == COLOR_WHITE ? RANK_1 : RANK_8;
-			BitBoard targetMask = ((TYPE & QUIETS) ? ~position.GetPieces(C) : ZERO_BB) | ((TYPE & CAPTURES) ? position.GetPieces(OtherColor(C)) : ZERO_BB);
 			BitBoard attacks = GetAttacks<PIECE_KING>(position.GetKingSquare(C));
-			moveList = AddMoves(attacks & targetMask, position.GetKingSquare(C), moveList);
+			moveList = AddMoves(attacks & availableSquares, position.GetKingSquare(C), moveList);
 
-			if constexpr (bool(TYPE & QUIETS))
+			constexpr SquareIndex KingsideCastleSquare = CreateSquare(FILE_G, CastleRank);
+			constexpr SquareIndex QueensideCastleSquare = CreateSquare(FILE_C, CastleRank);
+
+			// Castling moves - does not check that we are castling through/into check
+			// Does check that the squares between king and rook are empty
+			if (position.Colors[C].CastleKingSide && (availableSquares & KingsideCastleSquare)
+				&& !position.SquareOccupied(CreateSquare(FILE_F, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_G, CastleRank)))
 			{
-				// Castling moves - does not check that we are castling through/into check
-				// Does check that the squares between king and rook are empty
-				if (position.Colors[C].CastleKingSide && !position.SquareOccupied(CreateSquare(FILE_F, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_G, CastleRank)))
-				{
-					*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), CreateSquare(FILE_G, CastleRank), CASTLE);
-				}
-				if (position.Colors[C].CastleQueenSide && !position.SquareOccupied(CreateSquare(FILE_D, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_C, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_B, CastleRank)))
-				{
-					*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), CreateSquare(FILE_C, CastleRank), CASTLE);
-				}
+				*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), KingsideCastleSquare, CASTLE);
+			}
+			if (position.Colors[C].CastleQueenSide && (availableSquares & QueensideCastleSquare)
+				&& !position.SquareOccupied(CreateSquare(FILE_D, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_C, CastleRank)) && !position.SquareOccupied(CreateSquare(FILE_B, CastleRank)))
+			{
+				*moveList++ = CreateMove(CreateSquare(FILE_E, CastleRank), QueensideCastleSquare, CASTLE);
 			}
 			return moveList;
 		}
@@ -150,19 +158,41 @@ namespace Storm
 
 	// Generate all Pseudo-legal moves according to given GenerationType
 	template<Color C, GenerationType TYPE, Piece PIECE, typename MT>
-	inline MT* Generate(const Position& position, MT* moveList)
+	inline MT* Generate(const Position& position,  MT* moveList)
 	{
-		if constexpr (PIECE == PIECE_PAWN)
+		if constexpr (PIECE == PIECE_KING)
 		{
-			return Internal::GeneratePawnMoves<C, TYPE, MT>(position, moveList);
-		}
-		else if constexpr (PIECE == PIECE_KING)
-		{
-			return Internal::GenerateKingMoves<C, TYPE, MT>(position, moveList);
+			BitBoard availableSquares = ZERO_BB;
+			if (bool(TYPE & CAPTURES))
+				availableSquares |= position.GetPieces(OtherColor(C));
+			if (bool(TYPE & (EVASIONS | NON_EVASIONS)))
+			{
+				availableSquares |= ~position.GetPieces();
+			}
+			return Internal::GenerateKingMoves<C, MT>(position, availableSquares, moveList);
 		}
 		else
 		{
-			return Internal::GenerateMoves<C, TYPE, PIECE, MT>(position, moveList);
+			BitBoard availableSquares = ZERO_BB;
+			if constexpr (bool(TYPE & CAPTURES))
+			{
+				if (bool(TYPE & EVASIONS))
+					availableSquares |= position.GetCheckers();
+				if (bool(TYPE & NON_EVASIONS) || bool(TYPE & ~QUIETS))
+					availableSquares |= position.GetPieces(OtherColor(C));
+			}
+			if constexpr (bool(TYPE & EVASIONS))
+			{
+				SquareIndex checker = LeastSignificantBit(position.GetCheckers());
+				availableSquares |= GetBitBoardBetween(position.GetKingSquare(C), checker) & ~position.GetPieces();
+			}
+			if constexpr (bool(TYPE & NON_EVASIONS))
+				availableSquares |= ~position.GetPieces();
+
+			if constexpr (PIECE == PIECE_PAWN)
+				return Internal::GeneratePawnMoves<C, TYPE, MT>(position, availableSquares, moveList);
+			else
+				return Internal::GenerateMoves<C, PIECE, MT>(position, availableSquares, moveList);
 		}
 	}
 

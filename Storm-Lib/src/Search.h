@@ -3,6 +3,7 @@
 #include "MoveGeneration.h"
 #include "Format.h"
 #include "Evaluation.h"
+#include "TranspositionTable.h"
 
 #include <atomic>
 #include <chrono>
@@ -57,6 +58,8 @@ namespace Storm
 		};
 
 	private:
+		TranspositionTable m_TranspositionTable;
+
 		bool m_Log;
 		SearchLimits m_Limits;
 		std::vector<RootMove> m_RootMoves;
@@ -68,7 +71,7 @@ namespace Storm
 		std::atomic<bool> m_ShouldStop;
 
 	public:
-		Search(bool log = true);
+		Search(size_t ttSize, bool log = true);
 
 		size_t Perft(const Position& position, int depth);
 
@@ -85,6 +88,7 @@ namespace Storm
 		ValueType SearchPosition(Position& position, SearchStack* stack, int depth, ValueType alpha, ValueType beta, int& selDepth, bool cutNode);
 		template<NodeType NT>
 		ValueType QuiescenceSearch(Position& position, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode);
+
 		bool IsDraw(const Position& position, SearchStack* stack) const;
 		constexpr ValueType MateIn(int ply) const { return VALUE_MATE - ply; }
 		constexpr ValueType MatedIn(int ply) const { return -VALUE_MATE + ply; }
