@@ -94,9 +94,12 @@ namespace Storm
 		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);
 		void ApplyMove(Move move, UndoInfo* undo);
 		void ApplyNullMove();
+		bool IsPseudoLegal(Move move) const;
 		bool IsLegal(Move move) const;
 		BitBoard GetSliderBlockers(BitBoard sliders, SquareIndex toSquare, BitBoard* pinners) const;
 		BitBoard GetAttackersTo(SquareIndex square, Color by, BitBoard blockers) const;
+
+		bool SeeGE(Move move, ValueType threshold = 0) const;
 
 	private:
 		void MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to);
