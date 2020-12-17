@@ -150,22 +150,20 @@ namespace Test
 		REQUIRE(search.Perft(position, 5) == 164075551);
 	}
 
-	/*TEST_CASE("Transposition", "[Transposition]")
+	TEST_CASE("Transposition", "[Transposition]")
 	{
 		TranspositionTable tt;
 
 		Position position = CreateStartingPosition();
 
 		TranspositionTableEntry tte;
-		tte.Update(position.Hash, MOVE_NONE, 10, 487, UPPER_BOUND, 160, false);
+		tte.Update(position.Hash, MOVE_NONE, 10, BOUND_UPPER, 160);
 
 		REQUIRE(tte.GetHash() == position.Hash);
 		REQUIRE(tte.GetMove() == MOVE_NONE);
 		REQUIRE(tte.GetDepth() == 10);
-		REQUIRE(tte.GetScore() == 487);
-		REQUIRE(tte.GetFlag() == UPPER_BOUND);
-		REQUIRE(tte.GetAge() == 160);
-		REQUIRE(tte.IsPv() == false);
+		REQUIRE(tte.GetValue() == 160);
+		REQUIRE(tte.GetBound() == BOUND_UPPER);
 
 		bool found;
 		TranspositionTableEntry* entry = tt.GetEntry(position.Hash, found);
@@ -177,31 +175,25 @@ namespace Test
 		REQUIRE(newEntry->GetHash() == position.Hash);
 		REQUIRE(newEntry->GetMove() == MOVE_NONE);
 		REQUIRE(newEntry->GetDepth() == 10);
-		REQUIRE(newEntry->GetScore() == 487);
-		REQUIRE(newEntry->GetFlag() == UPPER_BOUND);
-		REQUIRE(newEntry->GetAge() == 160);
-		REQUIRE(newEntry->IsPv() == false);
+		REQUIRE(newEntry->GetValue() == 160);
+		REQUIRE(newEntry->GetBound() == BOUND_UPPER);
 
-		tte.Update(position.Hash, MOVE_NONE, 0, -23, EXACT, 2, true);
+		tte.Update(position.Hash, MOVE_NONE, 0, BOUND_EXACT, -23);
 		REQUIRE(tte.GetHash() == position.Hash);
 		REQUIRE(tte.GetMove() == MOVE_NONE);
 		REQUIRE(tte.GetDepth() == 0);
-		REQUIRE(tte.GetScore() == -23);
-		REQUIRE(tte.GetFlag() == EXACT);
-		REQUIRE(tte.GetAge() == 2);
-		REQUIRE(tte.IsPv() == true);
+		REQUIRE(tte.GetValue() == -23);
+		REQUIRE(tte.GetBound() == BOUND_EXACT);
 
-		Move move = PGN::CreateMoveFromString(position, "e4");
+		Move move = CreateMove(e2, e4);
 
-		tte.Update(position.Hash, move, -5, SCORE_MATE - 10, EXACT, 22, true);
+		tte.Update(position.Hash, move, -5, BOUND_EXACT, VALUE_MATE - 10);
 		REQUIRE(tte.GetHash() == position.Hash);
 		REQUIRE(tte.GetMove() == move);
 		REQUIRE(tte.GetDepth() == -5);
-		REQUIRE(tte.GetScore() == SCORE_MATE - 10);
-		REQUIRE(tte.GetFlag() == EXACT);
-		REQUIRE(tte.GetAge() == 22);
-		REQUIRE(tte.IsPv() == true);
-	}*/
+		REQUIRE(tte.GetValue() == VALUE_MATE - 10);
+		REQUIRE(tte.GetBound() == BOUND_EXACT);
+	}
 
 	TEST_CASE("Checks", "[Check]")
 	{
@@ -227,6 +219,57 @@ namespace Test
 		position.ApplyMove(move, &undo);
 
 		REQUIRE(position.InCheck() == true);
+	}
+
+	TEST_CASE("MoveGeneration", "[MOVEGEN]")
+	{
+		Init();
+
+		for (const std::string& fen : {
+				"rnbqkbnr/ppp2ppp/3p4/1B2p3/3PP3/8/PPP2PPP/RNBQK1NR b KQkq - 1 3",
+				"1k1r4/1bp1qp2/Rp2p2p/4P3/1P1P4/Q2B2r1/1P3P1P/R5K1 w - - 0 27",
+				"Rk1r4/1b2qp2/1pp1p2p/4P3/1P1P4/Q2B2P1/1P3P2/R5K1 b - - 1 28",
+				"8/R1k2p2/1pp1p2p/1P2P3/3P4/6P1/1P3P2/6K1 b - - 0 34",
+				"1k2Q3/8/1p1R4/7p/1p1P4/6P1/1P3P2/6K1 b - - 0 41",
+				"8/1k1Q4/1p1R4/7p/1p1P4/6P1/1P3P2/6K1 b - - 2 42",
+				"k2Q4/8/1p1R4/7p/1p1P4/6P1/1P3P2/6K1 b - - 4 43",
+				"8/1k2Q3/1p1R4/7p/1p1P4/6P1/1P3P2/6K1 b - - 6 44",
+				"8/8/kp1R4/7p/1p1P4/6P1/1P2QP2/6K1 b - - 8 45",
+				"8/8/1p6/k2R3p/1p1P4/6P1/1P2QP2/6K1 b - - 10 46",
+				"8/8/8/kQ1R3p/1p1P4/6P1/1P3P2/6K1 b - - 0 47",
+			})
+		{
+			Position position = CreatePositionFromFEN(fen);
+			Move moves[MAX_MOVES];
+			MoveList list(moves);
+			list.FillLegal<ALL>(position);
+
+			Move qMoves[MAX_MOVES];
+			MoveList qList(qMoves);
+			
+			if (position.ColorToMove == COLOR_WHITE)
+				qList.Fill(GenerateAll<COLOR_WHITE, CAPTURES | EVASIONS>(position, qList.GetStart()));
+			else
+				qList.Fill(GenerateAll<COLOR_BLACK, CAPTURES | EVASIONS>(position, qList.GetStart()));
+
+			for (Move mv : list)
+			{
+				REQUIRE(std::find(qList.begin(), qList.end(), mv) != qList.end());
+			}
+		}
+	}
+
+	TEST_CASE("SEE", "[SEE]")
+	{
+		Init();
+
+		UndoInfo undo;
+		Position position = CreateStartingPosition();
+		position.ApplyMove(CreateMove(e2, e4), &undo);
+		position.ApplyMove(CreateMove(a7, a6), &undo);
+
+		REQUIRE(!position.SeeGE(CreateMove(f1, a6)));
+
 	}
 
 	/*TEST_CASE("Mirror", "[Evaluation]")

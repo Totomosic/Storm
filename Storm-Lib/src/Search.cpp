@@ -125,15 +125,40 @@ namespace Storm
             m_Nodes = 0;
             m_StartSearchTime = std::chrono::high_resolution_clock::now();
 
-            ValueType value = SearchPosition<PV>(position, stackPtr, rootDepth, alpha, beta, selDepth, false);
-            bestValue = value;
-
-            std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
-
-            if (CheckLimits())
+            ValueType delta = 0;
+            if (depth >= AspirationWindowDepth)
             {
-                m_Stopped = true;
-                break;
+                delta = 20;
+                alpha = std::max(bestValue - delta, -VALUE_MATE);
+                beta = std::min(bestValue + delta, VALUE_MATE);
+            }
+
+            while (true)
+            {
+                ValueType value = SearchPosition<PV>(position, stackPtr, rootDepth, alpha, beta, selDepth, false);
+                bestValue = value;
+
+                std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
+
+                if (value <= alpha && value != -VALUE_MATE)
+                {
+                    beta = (alpha + beta) / 2;
+                    alpha = std::max(value - delta, -VALUE_MATE);
+                }
+                else if (value >= beta && value != VALUE_MATE)
+                {
+                    beta = std::min(value + delta, VALUE_MATE);
+                }
+                else
+                    break;
+
+                if (CheckLimits())
+                {
+                    m_Stopped = true;
+                    break;
+                }
+
+                delta += delta / 4 + 5;
             }
 
             RootMove& rootMove = m_RootMoves[0];
@@ -205,9 +230,9 @@ namespace Storm
         TranspositionTableEntry* ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
 
         ValueType ttValue = ttHit ? ttEntry->GetValue() : VALUE_NONE;
-        Move ttMove = ttHit ? ttEntry->GetMove() : MOVE_NONE;
+        Move ttMove = IsRoot ? m_RootMoves[0].Pv[0] : ttHit ? ttEntry->GetMove() : MOVE_NONE;
 
-        if (!IsRoot && ttHit && ttEntry->GetDepth() >= depth)
+        if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
         {
             EntryBound bound = ttEntry->GetBound();
             if (bound == BOUND_EXACT)
@@ -220,71 +245,77 @@ namespace Storm
                 return alpha;
         }
 
-        Move moves[MAX_MOVES];
-        Move* it = moves;
-        Move* end;
-
-        if (position.ColorToMove == COLOR_WHITE)
-            end = GenerateAll<COLOR_WHITE, ALL>(position, moves);
-        else
-            end = GenerateAll<COLOR_BLACK, ALL>(position, moves);
+        MoveSelector<ALL_MOVES> selector(position, ttMove);
 
         ValueType bestValue = -VALUE_MATE;
         Move bestMove = MOVE_NONE;
         int moveIndex = 0;
 
-        while (it != end)
+        Move move;
+
+        while ((move = selector.GetNextMove()) != MOVE_NONE)
         {
-            if (position.IsLegal(*it))
+            moveIndex++;
+            bool givesCheck = position.GivesCheck(move);
+
+            if (!position.IsLegal(move))
             {
-                moveIndex++;
-                bool givesCheck = position.GivesCheck(*it);
-                Position movedPosition = position;
-                movedPosition.ApplyMove(*it, &undo);
-                m_Nodes++;
+                moveIndex--;
+                continue;
+            }
 
+            Position movedPosition = position;
+            movedPosition.ApplyMove(move, &undo, givesCheck);
+            m_Nodes++;
+
+            ValueType value;
+            if (!IsPvNode || moveIndex > FirstMoveIndex)
+            {
+                value = -SearchPosition<NonPV>(movedPosition, stack + 1, depth - 1, -(alpha + 1), -alpha, selDepth, !cutNode);
+            }
+            if (IsPvNode && (moveIndex == FirstMoveIndex || (value > alpha && (IsRoot || value < beta))))
+            {
                 pv[0] = MOVE_NONE;
-                ValueType value = -SearchPosition<NT>(movedPosition, stack + 1, depth - 1, -beta, -alpha, selDepth, cutNode);
+                value = -SearchPosition<PV>(movedPosition, stack + 1, depth - 1, -beta, -alpha, selDepth, false);
+            }
 
-                if (CheckLimits())
-                {
-                    m_Stopped = true;
-                    return VALUE_NONE;
-                }
+            if (CheckLimits())
+            {
+                m_Stopped = true;
+                return VALUE_NONE;
+            }
 
-                if (IsRoot)
+            if (IsRoot)
+            {
+                RootMove& rootMove = *std::find(m_RootMoves.begin(), m_RootMoves.end(), move);
+                if (moveIndex == FirstMoveIndex || (value > alpha))
                 {
-                    RootMove& rootMove = *std::find(m_RootMoves.begin(), m_RootMoves.end(), *it);
-                    if (moveIndex == FirstMoveIndex || (value > alpha))
-                    {
-                        rootMove.Score = value;
-                        rootMove.SelDepth = selDepth;
-                        rootMove.Pv.resize(1);
-                        for (Move* m = (stack + 1)->PV; *m != MOVE_NONE; ++m)
-                            rootMove.Pv.push_back(*m);
-                    }
-                    else
-                        rootMove.Score = -VALUE_MATE;
+                    rootMove.Score = value;
+                    rootMove.SelDepth = selDepth;
+                    rootMove.Pv.resize(1);
+                    for (Move* m = (stack + 1)->PV; *m != MOVE_NONE; ++m)
+                        rootMove.Pv.push_back(*m);
                 }
+                else
+                    rootMove.Score = -VALUE_MATE;
+            }
 
-                if (value > bestValue)
+            if (value > bestValue)
+            {
+                bestValue = value;
+                bestMove = move;
+                if (value > alpha)
                 {
-                    bestValue = value;
-                    bestMove = *it;
-                    if (value > alpha)
-                    {
-                        alpha = value;
-                        if (IsPvNode)
-                            UpdatePV(stack->PV, *it, (stack + 1)->PV);
-                    }
-                }
-                if (value >= beta)
-                {
-                    ttEntry->Update(ttHash, *it, depth, BOUND_LOWER, value);
-                    return value;
+                    alpha = value;
+                    if (IsPvNode)
+                        UpdatePV(stack->PV, move, (stack + 1)->PV);
                 }
             }
-            ++it;
+            if (value >= beta)
+            {
+                ttEntry->Update(ttHash, move, depth, BOUND_LOWER, value);
+                return value;
+            }
         }
 
         if (bestValue == -VALUE_MATE)
@@ -326,36 +357,22 @@ namespace Storm
         (stack + 1)->Ply = stack->Ply + 1;
         (stack + 1)->PV = pv;
 
-        Move moves[MAX_MOVES];
-        Move* it = moves;
-        Move* end;
-
-        if (inCheck)
-        {
-            if (position.ColorToMove == COLOR_WHITE)
-                end = GenerateAll<COLOR_WHITE, CAPTURES | EVASIONS>(position, moves);
-            else
-                end = GenerateAll<COLOR_BLACK, CAPTURES | EVASIONS>(position, moves);
-        }
-        else
-        {
-            if (position.ColorToMove == COLOR_WHITE)
-                end = GenerateAll<COLOR_WHITE, CAPTURES>(position, moves);
-            else
-                end = GenerateAll<COLOR_BLACK, CAPTURES>(position, moves);
-        }
+        MoveSelector<QUIESCENCE> selector(position, MOVE_NONE);
 
         ValueType bestValue = -VALUE_MATE;
         int moveIndex = 0;
 
-        while (it != end)
+        Move move;
+
+        while ((move = selector.GetNextMove()) != MOVE_NONE)
         {
-            if (position.IsLegal(*it))
+            STORM_ASSERT(position.SeeGE(move), "Invalid QMove");
+            if (position.IsLegal(move))
             {
                 moveIndex++;
-                bool givesCheck = position.GivesCheck(*it);
+                bool givesCheck = position.GivesCheck(move);
                 Position movedPosition = position;
-                movedPosition.ApplyMove(*it, &undo);
+                movedPosition.ApplyMove(move, &undo, givesCheck);
                 m_Nodes++;
 
                 pv[0] = MOVE_NONE;
@@ -374,13 +391,12 @@ namespace Storm
                     {
                         alpha = value;
                         if (IsPvNode)
-                            UpdatePV(stack->PV, *it, (stack + 1)->PV);
+                            UpdatePV(stack->PV, move, (stack + 1)->PV);
                     }
                 }
                 if (value >= beta)
                     return value;
             }
-            ++it;
         }
 
         if (inCheck && bestValue == -VALUE_MATE)

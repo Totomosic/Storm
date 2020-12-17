@@ -24,7 +24,8 @@ namespace Storm
 
 	namespace Internal
 	{
-		inline Move* AddMoves(BitBoard moves, SquareIndex fromSquare, Move* moveList)
+		template<typename MT>
+		inline MT* AddMoves(BitBoard moves, SquareIndex fromSquare, MT* moveList)
 		{
 			while (moves)
 			{
@@ -34,7 +35,8 @@ namespace Storm
 			return moveList;
 		}
 
-		inline Move* AddMoves(BitBoard moves, SquareIndex fromSquare, Piece promotionPiece, Move* moveList)
+		template<typename MT>
+		inline MT* AddMoves(BitBoard moves, SquareIndex fromSquare, Piece promotionPiece, MT* moveList)
 		{
 			while (moves)
 			{
@@ -183,8 +185,11 @@ namespace Storm
 			}
 			if constexpr (bool(TYPE & EVASIONS))
 			{
-				SquareIndex checker = LeastSignificantBit(position.GetCheckers());
-				availableSquares |= GetBitBoardBetween(position.GetKingSquare(C), checker) & ~position.GetPieces();
+				if (position.InCheck())
+				{
+					SquareIndex checker = LeastSignificantBit(position.GetCheckers());
+					availableSquares |= GetBitBoardBetween(position.GetKingSquare(C), checker) & ~position.GetPieces();
+				}
 			}
 			if constexpr (bool(TYPE & NON_EVASIONS))
 				availableSquares |= ~position.GetPieces();

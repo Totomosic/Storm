@@ -90,7 +90,7 @@ namespace Storm
 		BitBoard pieces = position.GetPieces(C, P);
 		while (pieces)
 		{
-			result.Stage += GameStageWeights[P - PIECE_START];
+			result.Stage -= GameStageWeights[P - PIECE_START];
 			SquareIndex square = PopLeastSignificantBit(pieces);
 			mg += PieceSquareTables[C][P - PIECE_START][MIDGAME][square];
 			eg += PieceSquareTables[C][P - PIECE_START][ENDGAME][square];
@@ -132,7 +132,7 @@ namespace Storm
 	EvaluationResult EvaluateDetailed(const Position& position)
 	{
 		EvaluationResult result;
-		result.Stage = 0;
+		result.Stage = GameStageMax;
 
 		EvaluationData data;
 		data.KingAttackZone[COLOR_WHITE] = GetKingAttackZone<COLOR_WHITE>(position);

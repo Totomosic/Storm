@@ -1,9 +1,10 @@
 #pragma once
 #include "Position.h"
-#include "MoveGeneration.h"
+#include "MoveSelection.h"
 #include "Format.h"
 #include "Evaluation.h"
 #include "TranspositionTable.h"
+#include "SearchConstants.h"
 
 #include <atomic>
 #include <chrono>
