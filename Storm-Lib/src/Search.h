@@ -32,6 +32,7 @@ namespace Storm
 		Move CurrentMove;
 		ValueType StaticEvaluation;
 		ZobristHash* PositionHistory;
+		int MoveCount;
 	};
 
 	class STORM_API RootMove
