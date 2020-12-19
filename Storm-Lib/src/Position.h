@@ -89,6 +89,7 @@ namespace Storm
 
 		inline Piece GetMovingPiece(Move move) const { return GetPieceOnSquare(GetFromSquare(move)); }
 		inline Piece GetCapturedPiece(Move move) const { return GetPieceOnSquare(GetToSquare(move)); }
+		inline bool IsCapture(Move move) const { return GetCapturedPiece(move) != PIECE_NONE; }
 
 		bool GivesCheck(Move move) const;
 		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);

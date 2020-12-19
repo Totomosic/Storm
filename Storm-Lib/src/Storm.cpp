@@ -10,6 +10,7 @@ namespace Storm
 		InitAttacks();
 		InitZobristHash();
 		InitEvaluation();
+		InitSearch();
 	}
 
 }

@@ -8,7 +8,6 @@
 #include "Position.h"
 #include "Search.h"
 
-
 namespace Storm
 {
 

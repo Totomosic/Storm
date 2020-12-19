@@ -5,9 +5,19 @@ namespace Storm
 {
 
 	template<MoveSelectorType TYPE>
-	MoveSelector<TYPE>::MoveSelector(const Position& position, Move hashMove)
-		: m_MoveBuffer(), m_Start(nullptr), m_End(nullptr), m_BadCapturesStart(nullptr), m_Stage(FIND_TT_MOVE), m_Position(position), m_HashMove(hashMove)
+	MoveSelector<TYPE>::MoveSelector(const Position& position, Move hashMove, Move counterMove, Move killers[2])
+		: m_Stage(FIND_TT_MOVE), m_Position(position), m_HashMove(hashMove), m_CounterMove(counterMove), m_Killers(killers)
 	{
+		STORM_ASSERT(TYPE == ALL_MOVES, "Invalid Type");
+		if (m_HashMove == MOVE_NONE)
+			NextStage();
+	}
+
+	template<MoveSelectorType TYPE>
+	MoveSelector<TYPE>::MoveSelector(const Position& position)
+		: m_Stage(FIND_TT_MOVE), m_Position(position), m_HashMove(MOVE_NONE)
+	{
+		STORM_ASSERT(TYPE == QUIESCENCE, "Invalid Type");
 		if (m_HashMove == MOVE_NONE)
 			NextStage();
 	}
@@ -15,6 +25,7 @@ namespace Storm
 	template<MoveSelectorType TYPE>
 	Move MoveSelector<TYPE>::GetNextMove()
 	{
+top:
 		switch (m_Stage)
 		{
 		case FIND_TT_MOVE:
@@ -24,7 +35,7 @@ namespace Storm
 				return m_HashMove;
 			}
 			NextStage();
-			return GetNextMove();
+			goto top;
 		case GENERATE_CAPTURES:
 			GenerateCaptures();
 			NextStage();
@@ -37,11 +48,11 @@ namespace Storm
 				m_Start++;
 			}
 			NextStage();
-			return GetNextMove();
+			goto top;
 		case GENERATE_QUIETS:
 			GenerateQuiets();
 			NextStage();
-			return GetNextMove();
+			goto top;
 		case FIND_QUIETS:
 			while (m_Start != m_End)
 			{
@@ -50,7 +61,7 @@ namespace Storm
 				m_Start++;
 			}
 			NextStage();
-			return GetNextMove();
+			goto top;
 		case FIND_BAD_CAPTURES:
 			while (m_BadCapturesStart != m_BadCapturesEnd)
 			{
@@ -59,7 +70,7 @@ namespace Storm
 				m_BadCapturesStart++;
 			}
 			NextStage();
-			return GetNextMove();
+			goto top;
 		default:
 			break;
 		}
@@ -69,11 +80,7 @@ namespace Storm
 	template<MoveSelectorType TYPE>
 	void MoveSelector<TYPE>::NextStage()
 	{
-		if (m_Stage == FIND_QUIETS && TYPE == QUIESCENCE)
-		{
-			m_Stage = DONE;
-		}
-		else if (m_Stage == FIND_GOOD_CAPTURES && !m_Position.InCheck() && TYPE == QUIESCENCE)
+		if (m_Stage == FIND_GOOD_CAPTURES && !m_Position.InCheck() && TYPE == QUIESCENCE)
 		{
 			m_Stage = DONE;
 		}
@@ -91,9 +98,19 @@ namespace Storm
 		m_Start = m_MoveBuffer;
 		m_End = m_Start;
 		if (m_Position.ColorToMove == COLOR_WHITE)
-			end = GenerateAll<COLOR_WHITE, CAPTURES>(m_Position, m_Start);
+		{
+			if (m_Position.InCheck())
+				end = GenerateAll<COLOR_WHITE, EVASION_CAPTURES>(m_Position, m_Start);
+			else
+				end = GenerateAll<COLOR_WHITE, CAPTURES>(m_Position, m_Start);
+		}
 		else
-			end = GenerateAll<COLOR_BLACK, CAPTURES>(m_Position, m_Start);
+		{
+			if (m_Position.InCheck())
+				end = GenerateAll<COLOR_BLACK, EVASION_CAPTURES>(m_Position, m_Start);
+			else
+				end = GenerateAll<COLOR_BLACK, CAPTURES>(m_Position, m_Start);
+		}
 		m_BadCapturesEnd = std::end(m_MoveBuffer);
 		m_BadCapturesStart = m_BadCapturesEnd;
 		ValueMove* it = m_Start;
@@ -101,16 +118,22 @@ namespace Storm
 		{
 			if (m_Position.SeeGE(it->Move))
 			{
-				it->Value = VALUE_GOOD_CAPTURE;
+				it->Value = VALUE_GOOD_CAPTURE + GetPieceValueMg(m_Position.GetCapturedPiece(it->Move)) - GetPieceValueMg(m_Position.GetMovingPiece(it->Move));
+				if (GetMoveType(it->Move) == PROMOTION)
+					it->Value += GetPieceValueMg(GetPromotionPiece(it->Move));
 				std::swap(*it, *m_End++);
 			}
 			else
 			{
-				it->Value = VALUE_BAD_CAPTURE;
+				it->Value = VALUE_BAD_CAPTURE + GetPieceValueMg(m_Position.GetCapturedPiece(it->Move)) - GetPieceValueMg(m_Position.GetMovingPiece(it->Move));
+				if (GetMoveType(it->Move) == PROMOTION)
+					it->Value += GetPieceValueMg(GetPromotionPiece(it->Move));
 				std::swap(*it, *(--m_BadCapturesStart));
 			}
 			++it;
 		}
+		std::sort(m_Start, m_End, std::greater<ValueMove>());
+		std::sort(m_BadCapturesStart, m_BadCapturesEnd, std::greater<ValueMove>());
 	}
 
 	template<MoveSelectorType TYPE>
@@ -120,7 +143,7 @@ namespace Storm
 		if (m_Position.ColorToMove == COLOR_WHITE)
 		{
 			if (m_Position.InCheck())
-				m_End = GenerateAll<COLOR_WHITE, EVASIONS>(m_Position, m_Start);
+				m_End = GenerateAll<COLOR_WHITE, EVASION_QUIETS>(m_Position, m_Start);
 			else
 			{
 				STORM_ASSERT(TYPE != QUIESCENCE, "Invalid");
@@ -130,7 +153,7 @@ namespace Storm
 		else
 		{
 			if (m_Position.InCheck())
-				m_End = GenerateAll<COLOR_BLACK, EVASIONS>(m_Position, m_Start);
+				m_End = GenerateAll<COLOR_BLACK, EVASION_QUIETS>(m_Position, m_Start);
 			else
 			{
 				STORM_ASSERT(TYPE != QUIESCENCE, "Invalid");
@@ -139,11 +162,30 @@ namespace Storm
 		}
 
 		ValueMove* it = m_Start;
-		while (it != m_Start)
+		while (it != m_End)
 		{
 			it->Value = VALUE_QUIET;
+			if (GetMoveType(it->Move) == PROMOTION)
+			{
+				Piece promotion = GetPromotionPiece(it->Move);
+				if (promotion == PIECE_QUEEN || promotion == PIECE_KNIGHT)
+					it->Value += VALUE_GOOD_PROMOTION + GetPieceValueMg(promotion);
+				else
+					it->Value += VALUE_BAD_PROMOTION + GetPieceValueMg(promotion);
+			}
+			if constexpr (TYPE == ALL_MOVES)
+			{
+				if (*it == m_CounterMove)
+					it->Value += CounterMoveBonus;
+				if (*it == m_Killers[0])
+					it->Value += KillerMoveBonuses[0];
+				else if (*it == m_Killers[1])
+					it->Value += KillerMoveBonuses[1];
+			}
 			++it;
 		}
+
+		std::sort(m_Start, m_End, std::greater<ValueMove>());
 	}
 
 	template class MoveSelector<ALL_MOVES>;

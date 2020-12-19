@@ -23,16 +23,19 @@ namespace Storm
 		QUIESCENCE,
 	};
 
+	// Deliberately don't initialize
 	struct STORM_API ValueMove
 	{
 	public:
-		Storm::Move Move = MOVE_NONE;
-		ValueType Value = VALUE_NONE;
+		Storm::Move Move;
+		ValueType Value;
 
 	public:
 		ValueMove() = default;
+
+		// Don't initialize value
 		inline ValueMove(Storm::Move mv)
-			: Move(mv), Value(VALUE_NONE)
+			: Move(mv)
 		{}
 	};
 
@@ -41,6 +44,7 @@ namespace Storm
 	inline bool operator==(const ValueMove& left, Move right) { return left.Move == right; }
 	inline bool operator!=(const ValueMove& left, Move right) { return left.Move != right; }
 	inline bool operator<(const ValueMove& left, const ValueMove& right) { return left.Value < right.Value; }
+	inline bool operator>(const ValueMove& left, const ValueMove& right) { return left.Value > right.Value; }
 
 	template<MoveSelectorType TYPE>
 	class STORM_API MoveSelector
@@ -55,9 +59,12 @@ namespace Storm
 		MoveSelectionStage m_Stage;
 		const Position& m_Position;
 		Move m_HashMove;
+		Move* m_Killers;
+		Move m_CounterMove;
 
 	public:
-		MoveSelector(const Position& position, Move hashMove);
+		MoveSelector(const Position& position, Move hashMove, Move counterMove, Move killers[2]);
+		MoveSelector(const Position& position);
 
 		Move GetNextMove();
 

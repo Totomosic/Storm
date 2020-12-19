@@ -61,7 +61,8 @@ namespace Storm
 	constexpr ValueType QueenValueEg	= 950;
 	constexpr ValueType KingValueEg		= 20000;
 
-	constexpr ValueType PIECE_VALUES_MG[PIECE_COUNT] = {
+	constexpr ValueType PIECE_VALUES_MG[PIECE_COUNT + 1] = {
+		0, // PIECE_NONE
 		PawnValueMg,
 		KnightValueMg,
 		BishopValueMg,
@@ -70,7 +71,8 @@ namespace Storm
 		KingValueMg,
 	};
 
-	constexpr ValueType PIECE_VALUES_EG[PIECE_COUNT] = {
+	constexpr ValueType PIECE_VALUES_EG[PIECE_COUNT + 1] = {
+		0, // PIECE_NONE
 		PawnValueEg,
 		KnightValueEg,
 		BishopValueEg,
@@ -81,12 +83,12 @@ namespace Storm
 
 	constexpr ValueType GetPieceValueMg(Piece piece)
 	{
-		return PIECE_VALUES_MG[piece - PIECE_START];
+		return PIECE_VALUES_MG[piece];
 	}
 
 	constexpr ValueType GetPieceValueEg(Piece piece)
 	{
-		return PIECE_VALUES_EG[piece - PIECE_START];
+		return PIECE_VALUES_EG[piece];
 	}
 
 	// =======================================================================================================================================================================================
