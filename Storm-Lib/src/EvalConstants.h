@@ -1,5 +1,6 @@
 #pragma once
 #include "Types.h"
+#include "Bitboard.h"
 
 namespace Storm
 {
@@ -201,7 +202,7 @@ namespace Storm
 	};
 
 	constexpr int PawnAttackWeight = 0;
-	constexpr int KnightAttackWeight = 6;
+	constexpr int KnightAttackWeight = 8;
 	constexpr int BishopAttackWeight = 3;
 	constexpr int RookAttackWeight = 3;
 	constexpr int QueenAttackWeight = 5;
@@ -215,5 +216,21 @@ namespace Storm
 		QueenAttackWeight,
 		KingAttackWeight,
 	};
+
+	constexpr int GetAttackWeight(Piece piece)
+	{
+		return AttackWeights[piece - PIECE_START];
+	}
+
+	// =======================================================================================================================================================================================
+	// SPACE
+	// =======================================================================================================================================================================================
+
+	constexpr BitBoard CenterFiles = (FILE_C_BB | FILE_D_BB | FILE_E_BB | FILE_F_BB);
+	
+	constexpr ValueType GetSpaceValue(int piecesCount, int safeCount)
+	{
+		return safeCount * piecesCount * piecesCount / 30;
+	}
 
 }
