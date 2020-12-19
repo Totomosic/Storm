@@ -248,9 +248,9 @@ namespace Test
 			MoveList qList(qMoves);
 			
 			if (position.ColorToMove == COLOR_WHITE)
-				qList.Fill(GenerateAll<COLOR_WHITE, CAPTURES | EVASIONS>(position, qList.GetStart()));
+				qList.Fill(GenerateAll<COLOR_WHITE, EVASIONS>(position, qList.GetStart()));
 			else
-				qList.Fill(GenerateAll<COLOR_BLACK, CAPTURES | EVASIONS>(position, qList.GetStart()));
+				qList.Fill(GenerateAll<COLOR_BLACK, EVASIONS>(position, qList.GetStart()));
 
 			for (Move mv : list)
 			{

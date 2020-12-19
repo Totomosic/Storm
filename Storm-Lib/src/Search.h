@@ -12,7 +12,7 @@
 namespace Storm
 {
 
-	constexpr int MAX_PLY = 100;
+	void InitSearch();
 
 	struct STORM_API SearchLimits
 	{
@@ -28,6 +28,9 @@ namespace Storm
 	public:
 		int Ply;
 		Move* PV;
+		Move Killers[2];
+		Move CurrentMove;
+		ValueType StaticEvaluation;
 	};
 
 	class STORM_API RootMove
@@ -71,6 +74,8 @@ namespace Storm
 		bool m_Stopped;
 		std::atomic<bool> m_ShouldStop;
 
+		Move m_CounterMoves[SQUARE_MAX][SQUARE_MAX];
+
 	public:
 		Search(size_t ttSize, bool log = true);
 
@@ -97,6 +102,16 @@ namespace Storm
 		constexpr bool IsMateScore(ValueType score) const { return score >= MateIn(MAX_PLY) || score <= MatedIn(MAX_PLY); }
 		bool CheckLimits() const;
 		std::vector<RootMove> GenerateRootMoves(const Position& position) const;
+
+		template<typename T, size_t Width, size_t Height>
+		void ClearTable(T table[Width][Height], T value)
+		{
+			for (size_t i = 0; i < Width; i++)
+			{
+				for (size_t j = 0; j < Height; j++)
+					table[i][j] = value;
+			}
+		}
 
 	};
 

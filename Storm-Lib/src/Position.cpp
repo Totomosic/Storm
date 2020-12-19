@@ -60,12 +60,15 @@ namespace Storm
 
 	void Position::ApplyNullMove()
 	{
+		STORM_ASSERT(!GetCheckers(), "Cannot be in check");
 		if (EnpassantSquare != SQUARE_INVALID)
 		{
 			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
 			EnpassantSquare = SQUARE_INVALID;
 		}
 		Cache.CheckedBy = ZERO_BB;
+		UpdateCheckInfo(ColorToMove);
+
 		HalfTurnsSinceCaptureOrPush++;
 
 		if (ColorToMove == COLOR_BLACK)
@@ -90,6 +93,7 @@ namespace Storm
 		const File fromFile = FileOf(fromSquare);
 		const File toFile = FileOf(toSquare);
 		const Piece movingPiece = GetMovingPiece(move);
+		STORM_ASSERT(movingPiece != PIECE_NONE, "No piece on square");
 		const Piece capturedPiece = GetCapturedPiece(move);
 		const bool isPromotion = GetMoveType(move) == PROMOTION;
 		const bool isCapture = capturedPiece != PIECE_NONE;
