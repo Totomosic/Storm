@@ -12,7 +12,7 @@ namespace Storm
         {
             for (int index = 0; index < MAX_MOVES; index++)
             {
-                LmrReductions[depth][index] = int(std::round(1.0 + std::log(depth) + std::log(index) * 0.5));
+                LmrReductions[depth][index] = int(1.0 + std::log(depth) + std::log(index) * 0.5);
             }
         }
     }
@@ -144,6 +144,7 @@ namespace Storm
         stackPtr->CurrentMove = MOVE_NONE;
         stackPtr->StaticEvaluation = VALUE_NONE;
         stackPtr->PositionHistory = historyPtr;
+        stackPtr->MoveCount = 0;
 
         stackPtr++;
 
@@ -153,6 +154,7 @@ namespace Storm
         stackPtr->CurrentMove = MOVE_NONE;
         stackPtr->StaticEvaluation = VALUE_NONE;
         stackPtr->PositionHistory = historyPtr;
+        stackPtr->MoveCount = 0;
 
         stackPtr++;
 
@@ -162,6 +164,7 @@ namespace Storm
         stackPtr->CurrentMove = MOVE_NONE;
         stackPtr->StaticEvaluation = VALUE_NONE;
         stackPtr->PositionHistory = historyPtr;
+        stackPtr->MoveCount = 0;
 
         (stackPtr + 1)->Killers[0] = (stackPtr + 1)->Killers[1] = MOVE_NONE;
 
@@ -377,6 +380,7 @@ namespace Storm
                 movedPosition.ApplyNullMove();
 
                 stack->CurrentMove = MOVE_NONE;
+                stack->MoveCount = FirstMoveIndex;
 
                 ValueType value = -SearchPosition<NonPV>(movedPosition, stack + 1, depth - GetNullMoveDepthReduction(depth, stack->StaticEvaluation, beta), -beta, -beta + 1, selDepth, true);
                 if (value >= beta)
@@ -398,19 +402,40 @@ namespace Storm
             if (IsRoot && std::count(m_RootMoves.begin() + 0, m_RootMoves.end(), move) == 0)
                 continue;
 
-            moveIndex++;
-            bool givesCheck = position.GivesCheck(move);
-
-            STORM_ASSERT(moveIndex != FirstMoveIndex || ttMove == MOVE_NONE || move == ttMove, "Invalid move ordering");
-
-            if (!position.IsLegal(move))
+            if (!IsRoot && !position.IsLegal(move))
             {
-                moveIndex--;
                 continue;
             }
 
+            moveIndex++;
+            stack->MoveCount = moveIndex;
+
+            const bool givesCheck = position.GivesCheck(move);
             const bool isCapture = position.IsCapture(move);
             const bool isPromotion = GetMoveType(move) == PROMOTION;
+            const bool isCaptureOrPromotion = isCapture || isPromotion;
+
+            STORM_ASSERT(moveIndex != FirstMoveIndex || ttMove == MOVE_NONE || move == ttMove, "Invalid move ordering");
+
+            int newDepth = depth - 1;
+
+            // Shallow depth pruning
+            if (!IsRoot && position.GetNonPawnMaterial(position.ColorToMove) > 0 && !IsMateScore(bestValue))
+            {
+                if (!isCaptureOrPromotion && !givesCheck)
+                {
+                    int lmrDepth = std::max(newDepth - GetLmrReduction<true>(improving, depth, moveIndex), 0);
+                    if (!position.SeeGE(move, -(30 - std::min(lmrDepth, 18)) * lmrDepth * lmrDepth))
+                    {
+                        continue;
+                    }
+                }
+                else if (!position.SeeGE(move, -PawnValueEg * depth))
+                {
+                    continue;
+                }
+            }
+
             const bool goodCheck = givesCheck && position.SeeGE(move);
 
             int depthExtension = 0;
@@ -420,6 +445,8 @@ namespace Storm
             else if (goodCheck)
                 depthExtension = 1;
 
+            newDepth += depthExtension;
+
             Position movedPosition = position;
             movedPosition.ApplyMove(move, &undo, givesCheck);
             m_Nodes++;
@@ -427,14 +454,15 @@ namespace Storm
             stack->CurrentMove = move;
 
             ValueType value;
-            int newDepth = depth - 1 + depthExtension;
             bool fullDepthSearch = false;
 
-            if (depth >= LmrDepth && moveIndex > LmrMoveIndex + 2 * IsRoot && !depthExtension)
+            if (depth >= LmrDepth && moveIndex >= LmrMoveIndex + 2 * IsRoot && (!isCaptureOrPromotion || cutNode) && !depthExtension)
             {
                 int reduction = GetLmrReduction<IsPvNode>(improving, depth, moveIndex);
 
-                if (isCapture || isPromotion)
+                if (!isCaptureOrPromotion)
+                    reduction++;
+                if ((stack - 1)->MoveCount > 13)
                     reduction--;
 
                 int lmrDepth = std::clamp(newDepth - reduction, 1, newDepth);
@@ -536,7 +564,7 @@ namespace Storm
 
         if (!inCheck)
         {
-            if (evaluation >= beta)
+            if (evaluation >= beta + 250)
                 return evaluation;
             if (alpha < evaluation)
                 alpha = evaluation;

@@ -382,124 +382,109 @@ namespace Storm
 			(GetAttacks<PIECE_ROOK>(square, blockers) & GetPieces(by, PIECE_ROOK, PIECE_QUEEN));
 	}
 
-	template<Piece PIECE>
-	Piece MinAttacker(const Position& position, SquareIndex to, const BitBoard& sideToMoveAttackers, BitBoard& occupied, BitBoard& attackers)
+	BitBoard Position::GetAttackersTo(SquareIndex square, BitBoard blockers) const
 	{
-		BitBoard b = sideToMoveAttackers & position.GetPieces(PIECE);
-		if (!b)
-		{
-			return MinAttacker<Piece(PIECE + 1)>(position, to, sideToMoveAttackers, occupied, attackers);
-		}
-		occupied ^= LeastSignificantBit(b);
-		if (PIECE == PIECE_PAWN || PIECE == PIECE_BISHOP || PIECE == PIECE_QUEEN)
-		{
-			attackers |= GetAttacks<PIECE_BISHOP>(to, occupied) & position.GetPieces(PIECE_BISHOP, PIECE_QUEEN);
-		}
-		if (PIECE == PIECE_ROOK || PIECE == PIECE_QUEEN)
-		{
-			attackers |= GetAttacks<PIECE_ROOK>(to, occupied) & position.GetPieces(PIECE_ROOK, PIECE_QUEEN);
-		}
-		attackers &= occupied;
-		return PIECE;
+		return (GetAttacks<PIECE_PAWN>(square, COLOR_WHITE) & GetPieces(COLOR_WHITE, PIECE_PAWN)) |
+			(GetAttacks<PIECE_PAWN>(square, COLOR_BLACK) & GetPieces(COLOR_BLACK, PIECE_PAWN)) |
+			(GetAttacks<PIECE_KNIGHT>(square) & GetPieces(PIECE_KNIGHT)) |
+			(GetAttacks<PIECE_KING>(square) & GetPieces(PIECE_KING)) |
+			(GetAttacks<PIECE_BISHOP>(square, blockers) & GetPieces(PIECE_BISHOP, PIECE_QUEEN)) |
+			(GetAttacks<PIECE_ROOK>(square, blockers) & GetPieces(PIECE_ROOK, PIECE_QUEEN));
 	}
 
 	bool Position::SeeGE(Move move, ValueType threshold) const
 	{
+		if (GetMoveType(move) != NORMAL)
+			return VALUE_DRAW >= threshold;
 		SquareIndex from = GetFromSquare(move);
 		SquareIndex to = GetToSquare(move);
 		Piece captured = GetPieceOnSquare(to);
-		if (captured != PIECE_NONE)
+		BitBoard stmAttackers;
+
+		ValueType swap = GetPieceValueMg(captured) - threshold;
+		if (swap < 0)
+			return false;
+
+		// Assume they capture piece for free
+		swap = GetPieceValueMg(GetPieceOnSquare(from)) - swap;
+		if (swap <= 0)
+			return true;
+
+		Color stm = GetColorAt(from);
+		BitBoard occupied = GetPieces() ^ from ^ to;
+		BitBoard attackers = GetAttackersTo(to, occupied);
+		BitBoard bb;
+
+		int res = 1;
+
+		while (true)
 		{
-			BitBoard stmAttackers;
-			
-			Piece nextVictim = GetPieceOnSquare(from);
-			ValueType balance;
-			balance = GetPieceValueMg(captured) - threshold;
-			if (balance < 0)
-				return false;
+			stm = OtherColor(stm);
+			attackers &= occupied;
 
-			// Assume they capture piece for free
-			balance = GetPieceValueMg(nextVictim) - balance;
-			if (balance <= 0)
-				return true;
+			stmAttackers = attackers & GetPieces(stm);
+			if (stmAttackers == ZERO_BB)
+				break;
 
-			Color stm = GetColorAt(from);
-			BitBoard occupied = GetPieces() ^ from ^ to;
-			BitBoard attackers = GetAttackersTo(to, OtherColor(stm), occupied);
-			BitBoard bb;
+			if ((Cache.Pinners[OtherColor(stm)] & occupied) != ZERO_BB)
+				stmAttackers &= ~GetBlockersForKing(stm);
 
-			int res = 1;
+			if (!stmAttackers)
+				break;
 
-			while (true)
+			res ^= 1;
+
+			if ((bb = stmAttackers & GetPieces(PIECE_PAWN)))
 			{
-				stm = OtherColor(stm);
-				attackers &= occupied;
-
-				stmAttackers = attackers & GetPieces(stm);
-				if (stmAttackers == ZERO_BB)
+				if ((swap = PawnValueMg - swap) < res)
 					break;
 
-				if ((Cache.Pinners[OtherColor(stm)] & occupied) == ZERO_BB)
-					stmAttackers &= ~GetBlockersForKing(stm);
-
-				if (!stmAttackers)
-					break;
-
-				res ^= 1;
-
-				if ((bb = stmAttackers & GetPieces(PIECE_PAWN)))
-				{
-					if ((balance = PawnValueMg - balance) < res)
-						break;
-
-					occupied ^= LeastSignificantBit(bb);
-					attackers |= GetAttacks<PIECE_BISHOP>(to, occupied) & GetPieces(PIECE_BISHOP, PIECE_QUEEN);
-				}
-
-				else if ((bb = stmAttackers & GetPieces(PIECE_KNIGHT)))
-				{
-					if ((balance = KnightValueMg - balance) < res)
-						break;
-
-					occupied ^= LeastSignificantBit(bb);
-				}
-
-				else if ((bb = stmAttackers & GetPieces(PIECE_BISHOP)))
-				{
-					if ((balance = BishopValueMg - balance) < res)
-						break;
-
-					occupied ^= LeastSignificantBit(bb);
-					attackers |= GetAttacks<PIECE_BISHOP>(to, occupied) & GetPieces(PIECE_BISHOP, PIECE_QUEEN);
-				}
-
-				else if ((bb = stmAttackers & GetPieces(PIECE_ROOK)))
-				{
-					if ((balance = RookValueMg - balance) < res)
-						break;
-
-					occupied ^= LeastSignificantBit(bb);
-					attackers |= GetAttacks<PIECE_ROOK>(to, occupied) & GetPieces(PIECE_ROOK, PIECE_QUEEN);
-				}
-
-				else if ((bb = stmAttackers & GetPieces(PIECE_QUEEN)))
-				{
-					if ((balance = QueenValueMg - balance) < res)
-						break;
-
-					occupied ^= LeastSignificantBit(bb);
-					attackers |= (GetAttacks<PIECE_BISHOP>(to, occupied) & GetPieces(PIECE_BISHOP, PIECE_QUEEN))
-						| (GetAttacks<PIECE_ROOK>(to, occupied) & GetPieces(PIECE_ROOK, PIECE_QUEEN));
-				}
-
-				else // KING
-					 // If we "capture" with the king but opponent still has attackers,
-					 // reverse the result.
-					return (attackers & ~GetPieces(stm)) ? res ^ 1 : res;
+				occupied ^= LeastSignificantBit(bb);
+				attackers |= GetAttacks<PIECE_BISHOP>(to, occupied) & GetPieces(PIECE_BISHOP, PIECE_QUEEN);
 			}
-			return bool(res);
+
+			else if ((bb = stmAttackers & GetPieces(PIECE_KNIGHT)))
+			{
+				if ((swap = KnightValueMg - swap) < res)
+					break;
+
+				occupied ^= LeastSignificantBit(bb);
+			}
+
+			else if ((bb = stmAttackers & GetPieces(PIECE_BISHOP)))
+			{
+				if ((swap = BishopValueMg - swap) < res)
+					break;
+
+				occupied ^= LeastSignificantBit(bb);
+				attackers |= GetAttacks<PIECE_BISHOP>(to, occupied) & GetPieces(PIECE_BISHOP, PIECE_QUEEN);
+			}
+
+			else if ((bb = stmAttackers & GetPieces(PIECE_ROOK)))
+			{
+				if ((swap = RookValueMg - swap) < res)
+					break;
+
+				occupied ^= LeastSignificantBit(bb);
+				attackers |= GetAttacks<PIECE_ROOK>(to, occupied) & GetPieces(PIECE_ROOK, PIECE_QUEEN);
+			}
+
+			else if ((bb = stmAttackers & GetPieces(PIECE_QUEEN)))
+			{
+				if ((swap = QueenValueMg - swap) < res)
+					break;
+
+				occupied ^= LeastSignificantBit(bb);
+				attackers |= (GetAttacks<PIECE_BISHOP>(to, occupied) & GetPieces(PIECE_BISHOP, PIECE_QUEEN))
+					| (GetAttacks<PIECE_ROOK>(to, occupied) & GetPieces(PIECE_ROOK, PIECE_QUEEN));
+			}
+
+			else // KING
+					// If we "capture" with the king but opponent still has attackers,
+					// reverse the result.
+				return (attackers & ~GetPieces(stm)) ? res ^ 1 : res;
 		}
-		return threshold <= 0;
+		return bool(res);
 	}
 
 	void Position::MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to)

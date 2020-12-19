@@ -99,6 +99,7 @@ namespace Storm
 		bool IsLegal(Move move) const;
 		BitBoard GetSliderBlockers(BitBoard sliders, SquareIndex toSquare, BitBoard* pinners) const;
 		BitBoard GetAttackersTo(SquareIndex square, Color by, BitBoard blockers) const;
+		BitBoard GetAttackersTo(SquareIndex square, BitBoard blockers) const;
 
 		bool SeeGE(Move move, ValueType threshold = 0) const;
 
