@@ -11,6 +11,10 @@ namespace Storm
 		BitBoard KingAttackZone[COLOR_MAX];
 		int AttackerCount[COLOR_MAX];
 		int AttackUnits[COLOR_MAX];
+
+		// Includes PIECE_ALL
+		BitBoard AttackedBy[COLOR_MAX][PIECE_MAX + 2];
+		BitBoard AttackedByTwice[COLOR_MAX];
 	};
 
 	struct STORM_API EvaluationResult
@@ -23,6 +27,7 @@ namespace Storm
 		ValueType Rooks[COLOR_MAX][GAME_STAGE_MAX];
 		ValueType Queens[COLOR_MAX][GAME_STAGE_MAX];
 		ValueType KingSafety[COLOR_MAX][GAME_STAGE_MAX];
+		ValueType Space[COLOR_MAX][GAME_STAGE_MAX];
 		int Stage;
 
 	public:
@@ -36,7 +41,8 @@ namespace Storm
 				Bishops[C][S] +
 				Rooks[C][S] +
 				Queens[C][S] +
-				KingSafety[C][S];
+				KingSafety[C][S] +
+				Space[C][S];
 		}
 
 		template<GameStage S>
@@ -95,6 +101,9 @@ namespace Storm
 
 	template<Color C>
 	void EvaluateKingSafety(const Position& position, EvaluationResult& result, const EvaluationData& data);
+
+	template<Color C>
+	void EvaluateSpace(const Position& position, EvaluationResult& result, const EvaluationData& data);
 
 	std::string FormatEvaluation(const EvaluationResult& result);
 

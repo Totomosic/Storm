@@ -31,6 +31,7 @@ namespace Storm
 		Move Killers[2];
 		Move CurrentMove;
 		ValueType StaticEvaluation;
+		ZobristHash* PositionHistory;
 	};
 
 	class STORM_API RootMove
@@ -63,6 +64,7 @@ namespace Storm
 
 	private:
 		TranspositionTable m_TranspositionTable;
+		std::vector<ZobristHash> m_PositionHistory;
 
 		bool m_Log;
 		SearchLimits m_Limits;
@@ -79,8 +81,9 @@ namespace Storm
 	public:
 		Search(size_t ttSize, bool log = true);
 
-		size_t Perft(const Position& position, int depth);
+		void PushPosition(const ZobristHash& hash);
 
+		size_t Perft(const Position& position, int depth);
 		void Ponder(const Position& position, SearchLimits limits = {});
 		Move SearchBestMove(const Position& position, SearchLimits limits);
 
@@ -98,6 +101,16 @@ namespace Storm
 		bool IsDraw(const Position& position, SearchStack* stack) const;
 		constexpr ValueType MateIn(int ply) const { return VALUE_MATE - ply; }
 		constexpr ValueType MatedIn(int ply) const { return -VALUE_MATE + ply; }
+
+		constexpr ValueType GetValueForTT(ValueType value, int ply) const {
+			return IsMateScore(value) ? (value < 0 ? value - ply : value + ply) : value;
+		}
+
+		constexpr ValueType GetValueFromTT(ValueType value, int ply) const
+		{
+			return IsMateScore(value) ? (value < 0 ? value + ply : value - ply) : value;
+		}
+
 		constexpr int GetPliesFromMateScore(ValueType score) const { return score < 0 ? score + VALUE_MATE : VALUE_MATE - score; }
 		constexpr bool IsMateScore(ValueType score) const { return score >= MateIn(MAX_PLY) || score <= MatedIn(MAX_PLY); }
 		bool CheckLimits() const;

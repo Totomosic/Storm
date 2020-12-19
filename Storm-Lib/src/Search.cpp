@@ -25,9 +25,14 @@ namespace Storm
     }
 
     Search::Search(size_t ttSize, bool log)
-        : m_TranspositionTable(ttSize), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_StartRootTime(), m_StartSearchTime(), m_Stopped(false), m_ShouldStop(false), m_CounterMoves()
+        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_StartRootTime(), m_StartSearchTime(), m_Stopped(false), m_ShouldStop(false), m_CounterMoves()
     {
         ClearTable<Move, SQUARE_MAX, SQUARE_MAX>(m_CounterMoves, MOVE_NONE);
+    }
+
+    void Search::PushPosition(const ZobristHash& hash)
+    {
+        m_PositionHistory.push_back(hash);
     }
 
     size_t Search::Perft(const Position& position, int depth)
@@ -122,15 +127,23 @@ namespace Storm
         int rootDepth = 1;
 
         Move pv[MAX_PLY];
+        ZobristHash* positionHistory = new ZobristHash[m_PositionHistory.size() + MAX_PLY];
         pv[0] = MOVE_NONE;
         SearchStack stack[MAX_PLY + 10];
         SearchStack* stackPtr = stack;
+        ZobristHash* historyPtr = positionHistory;
+
+        for (int i = 0; i < m_PositionHistory.size(); i++)
+        {
+            *historyPtr++ = m_PositionHistory[i];
+        }
 
         stackPtr->Ply = -2;
         stackPtr->PV = pv;
         stackPtr->Killers[0] = stackPtr->Killers[1] = MOVE_NONE;
         stackPtr->CurrentMove = MOVE_NONE;
         stackPtr->StaticEvaluation = VALUE_NONE;
+        stackPtr->PositionHistory = historyPtr;
 
         stackPtr++;
 
@@ -139,6 +152,7 @@ namespace Storm
         stackPtr->Killers[0] = stackPtr->Killers[1] = MOVE_NONE;
         stackPtr->CurrentMove = MOVE_NONE;
         stackPtr->StaticEvaluation = VALUE_NONE;
+        stackPtr->PositionHistory = historyPtr;
 
         stackPtr++;
 
@@ -147,6 +161,7 @@ namespace Storm
         stackPtr->Killers[0] = stackPtr->Killers[1] = MOVE_NONE;
         stackPtr->CurrentMove = MOVE_NONE;
         stackPtr->StaticEvaluation = VALUE_NONE;
+        stackPtr->PositionHistory = historyPtr;
 
         (stackPtr + 1)->Killers[0] = (stackPtr + 1)->Killers[1] = MOVE_NONE;
 
@@ -239,6 +254,7 @@ namespace Storm
             rootDepth++;
         }
 
+        delete[] positionHistory;
         return bestMove;
     }
 
@@ -261,18 +277,24 @@ namespace Storm
         pv[0] = MOVE_NONE;
         (stack + 1)->PV = pv;
         (stack + 1)->StaticEvaluation = VALUE_NONE;
+        (stack + 1)->PositionHistory = stack->PositionHistory + 1;
         (stack + 2)->Killers[0] = (stack + 2)->Killers[1] = MOVE_NONE;
 
-        ValueType originalAlpha = alpha;
+        stack->PositionHistory[0] = position.Hash;
 
-        if (stack->Ply > selDepth)
-            selDepth = stack->Ply;
+        ValueType originalAlpha = alpha;
 
         if (stack->Ply >= MAX_PLY)
             return VALUE_DRAW;
 
         if (depth <= 0)
             return QuiescenceSearch<NT>(position, stack, depth, alpha, beta, cutNode);
+
+        if (IsDraw(position, stack))
+            return VALUE_DRAW;
+
+        if (stack->Ply > selDepth)
+            selDepth = stack->Ply;
 
         // Mate distance pruning
         if (!IsRoot)
@@ -289,7 +311,7 @@ namespace Storm
         ZobristHash ttHash = position.Hash;
         TranspositionTableEntry* ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
 
-        ValueType ttValue = IsRoot ? m_RootMoves[0].Score : ttHit ? ttEntry->GetValue() : VALUE_NONE;
+        ValueType ttValue = IsRoot ? m_RootMoves[0].Score : ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
         Move ttMove = IsRoot ? m_RootMoves[0].Pv[0] : ttHit ? ttEntry->GetMove() : MOVE_NONE;
 
         if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
@@ -343,13 +365,13 @@ namespace Storm
             }
 
             // Futility Pruning
-            if (position.GetNonPawnMaterial() > 0 && depth <= FutilityDepth && stack->StaticEvaluation - GetFutilityMargin(depth) >= beta)
+            if (position.GetNonPawnMaterial() > 0 && depth <= FutilityDepth && stack->StaticEvaluation - GetFutilityMargin(depth) >= beta && !IsMateScore(stack->StaticEvaluation))
             {
                 return stack->StaticEvaluation;
             }
 
             // Null move pruning
-            if (depth >= NullMoveDepth && stack->StaticEvaluation >= beta)
+            if (depth >= NullMoveDepth && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
             {
                 Position movedPosition = position;
                 movedPosition.ApplyNullMove();
@@ -373,6 +395,9 @@ namespace Storm
 
         while ((move = selector.GetNextMove()) != MOVE_NONE)
         {
+            if (IsRoot && std::count(m_RootMoves.begin() + 0, m_RootMoves.end(), move) == 0)
+                continue;
+
             moveIndex++;
             bool givesCheck = position.GivesCheck(move);
 
@@ -386,6 +411,14 @@ namespace Storm
 
             const bool isCapture = position.IsCapture(move);
             const bool isPromotion = GetMoveType(move) == PROMOTION;
+            const bool goodCheck = givesCheck && position.SeeGE(move);
+
+            int depthExtension = 0;
+
+            if (GetMoveType(move) == CASTLE)
+                depthExtension = 1;
+            else if (goodCheck)
+                depthExtension = 1;
 
             Position movedPosition = position;
             movedPosition.ApplyMove(move, &undo, givesCheck);
@@ -394,17 +427,15 @@ namespace Storm
             stack->CurrentMove = move;
 
             ValueType value;
-            int newDepth = depth - 1;
+            int newDepth = depth - 1 + depthExtension;
             bool fullDepthSearch = false;
 
-            if (depth >= LmrDepth && moveIndex >= LmrMoveIndex + 2 * IsRoot)
+            if (depth >= LmrDepth && moveIndex > LmrMoveIndex + 2 * IsRoot && !depthExtension)
             {
                 int reduction = GetLmrReduction<IsPvNode>(improving, depth, moveIndex);
 
                 if (isCapture || isPromotion)
                     reduction--;
-                else if (cutNode)
-                    reduction++;
 
                 int lmrDepth = std::clamp(newDepth - reduction, 1, newDepth);
                 value = -SearchPosition<NonPV>(movedPosition, stack + 1, lmrDepth, -(alpha + 1), -alpha, selDepth, true);
@@ -468,7 +499,7 @@ namespace Storm
                     }
                     m_CounterMoves[GetFromSquare(previousMove)][GetToSquare(previousMove)] = move;
                 }
-                ttEntry->Update(ttHash, move, depth, BOUND_LOWER, value);
+                ttEntry->Update(ttHash, move, depth, BOUND_LOWER, GetValueForTT(value, stack->Ply));
                 return value;
             }
         }
@@ -480,7 +511,7 @@ namespace Storm
             return VALUE_DRAW;
         }
 
-        ttEntry->Update(ttHash, bestMove, depth, alpha > originalAlpha ? BOUND_EXACT : BOUND_UPPER, bestValue);
+        ttEntry->Update(ttHash, bestMove, depth, alpha > originalAlpha ? BOUND_EXACT : BOUND_UPPER, GetValueForTT(bestValue, stack->Ply));
 
         return bestValue;
     }
@@ -492,6 +523,8 @@ namespace Storm
         const bool inCheck = position.InCheck();
         Move pv[MAX_PLY];
         UndoInfo undo;
+
+        stack->PositionHistory[0] = position.Hash;
 
         if (IsDraw(position, stack))
             return VALUE_DRAW;
@@ -511,6 +544,7 @@ namespace Storm
 
         (stack + 1)->Ply = stack->Ply + 1;
         (stack + 1)->PV = pv;
+        (stack + 1)->PositionHistory = stack->PositionHistory + 1;
 
         MoveSelector<QUIESCENCE> selector(position);
 
@@ -529,6 +563,8 @@ namespace Storm
                 Position movedPosition = position;
                 movedPosition.ApplyMove(move, &undo, givesCheck);
                 m_Nodes++;
+
+                stack->CurrentMove = move;
 
                 pv[0] = MOVE_NONE;
                 ValueType value = -QuiescenceSearch<NT>(movedPosition, stack + 1, depth - 1, -beta, -alpha, cutNode);
@@ -564,6 +600,24 @@ namespace Storm
     {
         if (position.HalfTurnsSinceCaptureOrPush >= 100)
             return true;
+        if (stack && stack->Ply + m_PositionHistory.size() >= 8)
+        {
+            int ply = 4;
+            ZobristHash hash = position.Hash;
+            int count = 0;
+            while (true)
+            {
+                if (*(stack->PositionHistory - ply) == hash)
+                {
+                    count++;
+                    if (count >= 1) // 2
+                        return true;
+                }
+                else
+                    break;
+                ply += 4;
+            }
+        }
         return false;
     }
 

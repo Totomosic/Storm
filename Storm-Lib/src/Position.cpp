@@ -30,8 +30,8 @@ namespace Storm
 			Cache.PiecesByType[piece] = GetPieces(piece);
 			if (piece != PIECE_PAWN && piece != PIECE_KING)
 			{
-				Cache.NonPawnMaterial[COLOR_WHITE] += GetPieceValueMg(piece);
-				Cache.NonPawnMaterial[COLOR_BLACK] += GetPieceValueMg(piece);
+				Cache.NonPawnMaterial[COLOR_WHITE] += GetPieceValueMg(piece) * Popcount(GetPieces(COLOR_WHITE, piece));
+				Cache.NonPawnMaterial[COLOR_BLACK] += GetPieceValueMg(piece) * Popcount(GetPieces(COLOR_BLACK, piece));
 			}
 			BitBoard pieces = GetPieces(piece);
 			while (pieces)

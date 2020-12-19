@@ -116,7 +116,7 @@ top:
 		ValueMove* it = m_Start;
 		while (it != end)
 		{
-			if (m_Position.SeeGE(it->Move))
+			if (m_Position.SeeGE(it->Move, SeeThreshold))
 			{
 				it->Value = VALUE_GOOD_CAPTURE + GetPieceValueMg(m_Position.GetCapturedPiece(it->Move)) - GetPieceValueMg(m_Position.GetMovingPiece(it->Move));
 				if (GetMoveType(it->Move) == PROMOTION)

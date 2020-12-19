@@ -283,7 +283,7 @@ namespace Storm
 						if (m_CurrentPosition.IsLegal(move))
 						{
 							m_CurrentPosition.ApplyMove(move, &undo);
-							// m_Search.PushPosition(m_CurrentPosition);
+							m_Search.PushPosition(m_CurrentPosition.Hash);
 							legal = true;
 						}
 						break;

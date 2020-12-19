@@ -87,6 +87,8 @@ namespace Storm
 		ValueType mg = 0;
 		ValueType eg = 0;
 
+		data.AttackedBy[C][P] = ZERO_BB;
+
 		BitBoard pieces = position.GetPieces(C, P);
 		while (pieces)
 		{
@@ -100,10 +102,18 @@ namespace Storm
 				P == PIECE_BISHOP ? GetAttacks<PIECE_BISHOP>(square, position.GetPieces()) :
 				P == PIECE_ROOK ? GetAttacks<PIECE_ROOK>(square, position.GetPieces()) :
 				P == PIECE_QUEEN ? GetAttacks<PIECE_QUEEN>(square, position.GetPieces()) : ZERO_BB;
+
+			if (position.GetBlockersForKing(C) & square)
+				attacks &= GetLineBetween(position.GetKingSquare(C), square);
+
+			data.AttackedBy[C][P] |= attacks;
+			data.AttackedByTwice[C] |= data.AttackedBy[C][PIECE_ALL] & attacks;
+			data.AttackedBy[C][PIECE_ALL] |= attacks;
+
 			BitBoard kingAttacks = attacks & data.KingAttackZone[OtherColor(C)];
 			int attackCount = Popcount(kingAttacks);
 			data.AttackerCount[C] += bool(attackCount);
-			data.AttackUnits[C] += attackCount * AttackWeights[P - PIECE_START];
+			data.AttackUnits[C] += attackCount * GetAttackWeight(P);
 		}
 
 		result.SetPieceEval<C, P>(mg, eg);
@@ -129,18 +139,55 @@ namespace Storm
 		result.KingSafety[C][ENDGAME] = eg;
 	}
 
+	template<Color C>
+	void EvaluateSpace(const Position& position, EvaluationResult& result, const EvaluationData& data)
+	{
+		constexpr BitBoard SpaceMask =
+			C == COLOR_WHITE ? (CenterFiles & (RANK_2_BB | RANK_3_BB | RANK_4_BB))
+							 : (CenterFiles & (RANK_7_BB | RANK_6_BB | RANK_5_BB));
+		constexpr Direction Down = C == COLOR_WHITE ? SOUTH : NORTH;
+
+		ValueType mg = 0;
+		ValueType eg = 0;
+
+		if (position.GetNonPawnMaterial() > 5900)
+		{
+			BitBoard safe = SpaceMask & ~position.GetPieces(C, PIECE_PAWN) & ~data.AttackedBy[OtherColor(C)][PIECE_PAWN];
+			BitBoard behind = position.GetPieces(C, PIECE_PAWN);
+			behind |= Shift<Down>(behind);
+			behind |= Shift<Down>(behind);
+			behind |= Shift<Down>(behind);
+
+			int count = Popcount(safe) + Popcount(behind & safe & ~data.AttackedBy[OtherColor(C)][PIECE_ALL]);
+			int weight = Popcount(position.GetPieces(C));
+			mg = GetSpaceValue(weight, count);
+		}
+
+		result.Space[C][MIDGAME] = mg;
+		result.Space[C][ENDGAME] = eg;
+	}
+
+	template<Color C>
+	void InitEvaluationData(const Position& position, EvaluationData& data)
+	{
+		data.KingAttackZone[C] = GetKingAttackZone<C>(position);
+		data.AttackerCount[C] = 0;
+		data.AttackUnits[C] = 0;
+
+		data.AttackedBy[C][PIECE_KING] = GetAttacks<PIECE_KING>(position.GetKingSquare(C));
+		data.AttackedBy[C][PIECE_PAWN] = GetPawnAttacks<C>(position.GetPieces(C, PIECE_PAWN));
+		data.AttackedByTwice[C] = data.AttackedBy[C][PIECE_PAWN] & data.AttackedBy[C][PIECE_KING];
+		data.AttackedBy[C][PIECE_ALL] = data.AttackedBy[C][PIECE_PAWN] | data.AttackedBy[C][PIECE_KING];
+	}
+
 	EvaluationResult EvaluateDetailed(const Position& position)
 	{
 		EvaluationResult result;
 		result.Stage = GameStageMax;
 
 		EvaluationData data;
-		data.KingAttackZone[COLOR_WHITE] = GetKingAttackZone<COLOR_WHITE>(position);
-		data.KingAttackZone[COLOR_BLACK] = GetKingAttackZone<COLOR_BLACK>(position);
-		data.AttackerCount[COLOR_WHITE] = 0;
-		data.AttackerCount[COLOR_BLACK] = 0;
-		data.AttackUnits[COLOR_WHITE] = 0;
-		data.AttackUnits[COLOR_BLACK] = 0;
+		InitEvaluationData<COLOR_WHITE>(position, data);
+		InitEvaluationData<COLOR_BLACK>(position, data);
 
 		EvaluateMaterial<COLOR_WHITE>(position, result);
 		EvaluateMaterial<COLOR_BLACK>(position, result);
@@ -159,6 +206,9 @@ namespace Storm
 
 		EvaluateKingSafety<COLOR_WHITE>(position, result, data);
 		EvaluateKingSafety<COLOR_BLACK>(position, result, data);
+
+		EvaluateSpace<COLOR_WHITE>(position, result, data);
+		EvaluateSpace<COLOR_BLACK>(position, result, data);
 
 		return result;
 	}
@@ -216,6 +266,7 @@ namespace Storm
 		format += "          Rooks | " + FORMAT_TABLE_ROW(result.Rooks, SCORE_LENGTH) + '\n';
 		format += "         Queens | " + FORMAT_TABLE_ROW(result.Queens, SCORE_LENGTH) + '\n';
 		format += "    King Safety | " + FORMAT_TABLE_ROW(result.KingSafety, SCORE_LENGTH) + '\n';
+		format += "          Space | " + FORMAT_TABLE_ROW(result.Space, SCORE_LENGTH) + '\n';
 		format += " ---------------+---------------+---------------+--------------\n";
 		format += "          Total | " + FORMAT_TABLE_ROW(totals, SCORE_LENGTH) + "\n";
 		format += "\n";
