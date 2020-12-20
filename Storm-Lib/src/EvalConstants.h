@@ -184,6 +184,43 @@ namespace Storm
 	};
 
 	// =======================================================================================================================================================================================
+	// PASSED PAWNS
+	// =======================================================================================================================================================================================
+
+	extern BitBoard PassedPawnMasks[COLOR_MAX][SQUARE_MAX];
+	extern BitBoard SupportedPawnMasks[COLOR_MAX][SQUARE_MAX];
+	constexpr ValueType SupportedPassedPawn[GAME_STAGE_MAX] = { 35, 70 };
+
+	constexpr ValueType PassedPawnWeights[RANK_MAX][GAME_STAGE_MAX] = {
+		{   0,   0 }, // RANK 1
+		{   2,   9 }, // RANK 2
+		{   6,  12 }, // RANK 3
+		{   5,  15 }, // RANK 4
+		{  28,  31 }, // RANK 5
+		{  82,  84 }, // RANK 6
+		{ 135, 125 }, // RANK 7
+		{   0,   0 }, // RANK 8
+	};
+
+	template<Color C, GameStage S>
+	constexpr ValueType GetPassedPawnValue(Rank rank)
+	{
+		return PassedPawnWeights[RelativeRank<C>(rank)][S];
+	}
+
+	template<Color C>
+	inline bool IsPassedPawn(SquareIndex square, BitBoard enemyPawns)
+	{
+		return !(PassedPawnMasks[C][square] & enemyPawns);
+	}
+
+	template<Color C>
+	inline bool IsSupportedPawn(SquareIndex square, BitBoard ourPawns)
+	{
+		return SupportedPawnMasks[C][square] & ourPawns;
+	}
+
+	// =======================================================================================================================================================================================
 	// KING SAFETY
 	// =======================================================================================================================================================================================
 
@@ -221,6 +258,26 @@ namespace Storm
 	{
 		return AttackWeights[piece - PIECE_START];
 	}
+
+	// Pawns can never be on the 8th rank (1st rank used as a sentinel for when there is no pawn)
+	constexpr ValueType KingShieldStength[FILE_MAX / 2][RANK_MAX] = {
+		{ -3, 40, 45, 26, 20, 9, 13 },
+		{ -21, 22, 17, -25, -14, -5, -32 },
+		{ -5, 38, 12, -1, 16, 1, -22 },
+		{ -20, -7, -14, -15, -24, -33, -88 },
+	};
+
+	// Pawns can never be on the 8th rank (1st rank used as a sentinel for when there is no pawn)
+	constexpr ValueType PawnStormStrength[FILE_MAX / 2][RANK_MAX] = {
+		{ 45, -145, -85, 48, 27, 23, 27 },
+		{ 22, -13, 62, 23, 18, -3, 11 },
+		{ -3, 25, 81, 17, -1, -10, -5 },
+		{ -8, -6, 50, 2, 5, -8, -11 },
+	};
+
+	constexpr ValueType BlockedStormStrength[RANK_MAX] = {
+		0, 0, 36, -5, -4, -2, -1
+	};
 
 	// =======================================================================================================================================================================================
 	// SPACE

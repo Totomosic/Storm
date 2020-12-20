@@ -384,8 +384,9 @@ namespace Storm
 
 	BitBoard Position::GetAttackersTo(SquareIndex square, BitBoard blockers) const
 	{
-		return (GetAttacks<PIECE_PAWN>(square, COLOR_WHITE) & GetPieces(COLOR_WHITE, PIECE_PAWN)) |
-			(GetAttacks<PIECE_PAWN>(square, COLOR_BLACK) & GetPieces(COLOR_BLACK, PIECE_PAWN)) |
+		// Squares that pawns attack FROM are found by usng the pawn attacks of the OPPOSITE color
+		return (GetAttacks<PIECE_PAWN>(square, COLOR_BLACK) & GetPieces(COLOR_WHITE, PIECE_PAWN)) |
+			(GetAttacks<PIECE_PAWN>(square, COLOR_WHITE) & GetPieces(COLOR_BLACK, PIECE_PAWN)) |
 			(GetAttacks<PIECE_KNIGHT>(square) & GetPieces(PIECE_KNIGHT)) |
 			(GetAttacks<PIECE_KING>(square) & GetPieces(PIECE_KING)) |
 			(GetAttacks<PIECE_BISHOP>(square, blockers) & GetPieces(PIECE_BISHOP, PIECE_QUEEN)) |

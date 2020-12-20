@@ -5,6 +5,43 @@
 namespace Storm
 {
 
+	// =======================================================================================================================================================================================
+	// UTILS
+	// =======================================================================================================================================================================================
+
+	template<Color C>
+	constexpr Rank RelativeRank(Rank rank)
+	{
+		return C == COLOR_WHITE ? rank : Rank(RANK_MAX - rank - 1);
+	}
+
+	template<Color C>
+	inline SquareIndex FrontmostSquare(BitBoard board)
+	{
+		return C == COLOR_WHITE ? MostSignificantBit(board) : LeastSignificantBit(board);
+	}
+
+	constexpr BitBoard InFrontRanks[RANK_MAX] = {
+		ALL_SQUARES_BB,
+		ALL_SQUARES_BB & ~RANK_1_BB,
+		ALL_SQUARES_BB & ~RANK_1_BB & ~RANK_2_BB,
+		ALL_SQUARES_BB & ~RANK_1_BB & ~RANK_2_BB & ~RANK_3_BB,
+		ALL_SQUARES_BB & ~RANK_1_BB & ~RANK_2_BB & ~RANK_3_BB & ~RANK_4_BB,
+		ALL_SQUARES_BB & ~RANK_1_BB & ~RANK_2_BB & ~RANK_3_BB & ~RANK_4_BB & ~RANK_5_BB,
+		ALL_SQUARES_BB & ~RANK_1_BB & ~RANK_2_BB & ~RANK_3_BB & ~RANK_4_BB & ~RANK_5_BB & ~RANK_6_BB,
+		ALL_SQUARES_BB & ~RANK_1_BB & ~RANK_2_BB & ~RANK_3_BB & ~RANK_4_BB & ~RANK_5_BB & ~RANK_6_BB & ~RANK_7_BB,
+	};
+
+	template<Color C>
+	constexpr BitBoard InFrontOrEqual(Rank rank)
+	{
+		return InFrontRanks[RelativeRank<C>(rank)];
+	}
+
+	// =======================================================================================================================================================================================
+	// EVAL
+	// =======================================================================================================================================================================================
+
 	struct STORM_API EvaluationData
 	{
 	public:
