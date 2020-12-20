@@ -5,6 +5,8 @@ namespace Storm
 {
 
 	ValueType PieceSquareTables[COLOR_MAX][PIECE_COUNT][GAME_STAGE_MAX][SQUARE_MAX];
+	BitBoard PassedPawnMasks[COLOR_MAX][SQUARE_MAX];
+	BitBoard SupportedPawnMasks[COLOR_MAX][SQUARE_MAX];
 
 	void MirrorTable(ValueType* dest, const ValueType* src)
 	{
@@ -38,9 +40,26 @@ namespace Storm
 		InitPieceSquareTable<PIECE_KING>(WhiteKingsTableMidgameReversed, WhiteKingsTableEndgameReversed);
 	}
 
+	void InitPassedPawnMasks()
+	{
+		for (SquareIndex square = a1; square < SQUARE_MAX; square++)
+		{
+			BitBoard north = GetRay(NORTH, square);
+			BitBoard south = GetRay(SOUTH, square);
+
+			PassedPawnMasks[COLOR_WHITE][square] = north | Shift<EAST>(north) | Shift<WEST>(north);
+			PassedPawnMasks[COLOR_BLACK][square] = south | Shift<EAST>(south) | Shift<WEST>(south);
+
+			BitBoard sq = GetSquareBB(square);
+			SupportedPawnMasks[COLOR_WHITE][square] = Shift<EAST>(sq) | Shift<WEST>(sq) | Shift<SOUTH_EAST>(sq) | Shift<SOUTH_WEST>(sq);
+			SupportedPawnMasks[COLOR_BLACK][square] = Shift<EAST>(sq) | Shift<WEST>(sq) | Shift<NORTH_EAST>(sq) | Shift<NORTH_WEST>(sq);
+		}
+	}
+
 	void InitEvaluation()
 	{
 		InitPieceSquareTables();
+		InitPassedPawnMasks();
 	}
 
 	template<Color C>
@@ -70,11 +89,24 @@ namespace Storm
 		ValueType eg = 0;
 
 		BitBoard pawns = position.GetPieces(C, PIECE_PAWN);
+		BitBoard enemyPawns = position.GetPieces(OtherColor(C), PIECE_PAWN);
 		while (pawns)
 		{
 			SquareIndex square = PopLeastSignificantBit(pawns);
 			mg += PieceSquareTables[C][PIECE_PAWN - PIECE_START][MIDGAME][square];
 			eg += PieceSquareTables[C][PIECE_PAWN - PIECE_START][ENDGAME][square];
+
+			if (IsPassedPawn<C>(square, enemyPawns))
+			{
+				Rank rank = RankOf(square);
+				mg += GetPassedPawnValue<C, MIDGAME>(rank);
+				eg += GetPassedPawnValue<C, ENDGAME>(rank);
+				if (IsSupportedPawn<C>(square, pawns))
+				{
+					mg += SupportedPassedPawn[MIDGAME];
+					eg += SupportedPassedPawn[ENDGAME];
+				}
+			}
 		}
 
 		result.Pawns[C][MIDGAME] = mg;
@@ -125,15 +157,42 @@ namespace Storm
 		ValueType mg = 0;
 		ValueType eg = 0;
 
-		if (data.AttackerCount[OtherColor(C)] >= 2 && position.GetPieces(OtherColor(C), PIECE_QUEEN))
+		SquareIndex kingSquare = position.GetKingSquare(C);
+		File kingFile = FileOf(kingSquare);
+		Rank kingRank = RankOf(kingSquare);
+
+		if (data.AttackerCount[OtherColor(C)] >= 2)
 		{
 			ValueType danger = KingSafetyTable[std::min(data.AttackUnits[OtherColor(C)], MAX_ATTACK_UNITS - 1)];
+			if (!position.GetPieces(OtherColor(C), PIECE_QUEEN))
+				danger = std::max(danger - 200, 0);
 			mg -= danger;
-			eg -= danger / 3;
+			eg -= danger / 2;
 		}
 
-		mg += PieceSquareTables[C][PIECE_KING - PIECE_START][MIDGAME][position.GetKingSquare(C)];
-		eg += PieceSquareTables[C][PIECE_KING - PIECE_START][ENDGAME][position.GetKingSquare(C)];
+		const BitBoard pawnMask = InFrontOrEqual<C>(kingRank);
+
+		// King Shield
+		File kingFileCenter = std::clamp(kingFile, FILE_B, FILE_G);
+		for (File file = File(kingFileCenter - 1); file <= kingFileCenter + 1; file++)
+		{
+			// Only include pawns in front of our king
+			BitBoard ourPawns = FILE_MASKS[file] & position.GetPieces(C, PIECE_PAWN) & pawnMask & ~data.AttackedBy[OtherColor(C)][PIECE_PAWN];
+			BitBoard theirPawns = FILE_MASKS[file] & position.GetPieces(OtherColor(C), PIECE_PAWN) & pawnMask;
+
+			Rank ourRank = ourPawns ? RelativeRank<C>(RankOf(FrontmostSquare<OtherColor(C)>(ourPawns))) : RANK_1;
+			Rank theirRank = theirPawns ? RelativeRank<C>(RankOf(FrontmostSquare<OtherColor(C)>(theirPawns))) : RANK_1;
+
+			int distance = std::min<int>(file, FILE_MAX - file - 1);
+			mg += KingShieldStength[distance][ourRank];
+			if (ourRank > 0 && ourRank == theirRank - 1)
+				mg -= BlockedStormStrength[theirRank];
+			else
+				mg -= PawnStormStrength[distance][theirRank];
+		}
+
+		mg += PieceSquareTables[C][PIECE_KING - PIECE_START][MIDGAME][kingSquare];
+		eg += PieceSquareTables[C][PIECE_KING - PIECE_START][ENDGAME][kingSquare];
 
 		result.KingSafety[C][MIDGAME] = mg;
 		result.KingSafety[C][ENDGAME] = eg;

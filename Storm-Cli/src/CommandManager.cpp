@@ -380,7 +380,7 @@ namespace Storm
 		while (it != end)
 		{
 			if (m_CurrentPosition.IsLegal(*it))
-				std::cout << UCI::FormatMove(*it) << std::endl;
+				std::cout << std::boolalpha << UCI::FormatMove(*it) << " Gives Check: " << m_CurrentPosition.GivesCheck(*it) << " SEE: " << m_CurrentPosition.SeeGE(*it) << std::endl;
 			it++;
 		}
 	}
