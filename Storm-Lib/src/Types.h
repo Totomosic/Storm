@@ -166,7 +166,6 @@ namespace Storm
 
 	constexpr int PIECE_COUNT = PIECE_MAX - PIECE_START;
 
-	using Depth = int;
 	using ValueType = int;
 
 }

@@ -232,11 +232,11 @@ namespace Storm
 		std::transform(name.begin(), name.end(), name.begin(), [](char c) { return std::tolower(c); });
 		if (name == "multipv")
 		{
-			// m_Settings.MultiPV = std::max(0, std::stoi(value));
+			m_Settings.MultiPv = std::max(1, std::stoi(value));
 		}
 		if (name == "skill level")
 		{
-			// m_Settings.SkillLevel = std::min(std::max(0, std::stoi(value)), 20);
+			m_Settings.SkillLevel = std::min(std::max(0, std::stoi(value)), 20);
 		}
 		if (name == "book")
 		{
@@ -246,7 +246,7 @@ namespace Storm
 			else
 				std::cout << "Book file not found: " << value << std::endl;*/
 		}
-		// m_Search.SetSettings(m_Settings);
+		m_Search.SetSettings(m_Settings);
 	}
 
 	void CommandManager::SetPositionFen(const std::string& fen)

@@ -1,46 +1,26 @@
-project "Storm-Swig"
+project "Storm-Emscripten"
     location ""
-    kind "SharedLib"
+    kind "StaticLib"
     language "C++"
     cppdialect "C++17"
     staticruntime "on"
-
-    targetdir ("../bin/" .. StormOutputDir .. "/Storm-Swig")
-    objdir ("../bin-int/" .. StormOutputDir .. "/Storm-Swig")
-    targetname ("_Storm")
-
-    configmap
-    {
-        ["Debug"] = "Release"
-    }
-
-    prebuildcommands
-    {
-        "\"" .. PYTHON_EXECUTABLE .. "\" generate_swig.py --swig \"" .. SWIG_EXECUTABLE .. "\" " .. "\"../bin/" .. StormOutputDir .. "/Storm-Swig\""
-    }
-
+    
+    targetdir ("../bin/" .. StormOutputDir .. "/Storm-Emscripten")
+    objdir ("../bin-int/" .. StormOutputDir .. "/Storm-Emscripten")
+    
     files
     {
-        "Storm_wrapper.cpp"
+        "Emscripten.cpp",
     }
-
+    
     includedirs
     {
         "../%{StormIncludeDirs.spdlog}",
-        "../%{StormIncludeDirs.Storm}",
-        PYTHON_INCLUDE_DIR,
-    }
-
-    links
-    {
-        "Storm-Lib",
-        PYTHON_LIB_FILE,
+        "../%{StormIncludeDirs.Storm}"
     }
 
     filter "system:windows"
         systemversion "latest"
-
-        targetextension (".pyd")
 
         defines
         {
@@ -53,10 +33,7 @@ project "Storm-Swig"
     filter "system:linux"
         systemversion "latest"
 
-        targetextension (".so")
-        targetprefix ("")
-
-        removeconfigurations { "Release", "Dist" }
+        removeconfigurations { "DistShared", "ReleaseShared" }
 
         defines
         {
@@ -89,16 +66,6 @@ project "Storm-Swig"
         optimize "on"
 
     filter "configurations:Dist"
-        defines "STORM_DIST"
-        runtime "Release"
-        optimize "on"
-
-    filter "configurations:ReleaseShared"
-        defines "STORM_RELEASE"
-        runtime "Release"
-        optimize "on"
-
-    filter "configurations:DistShared"
         defines "STORM_DIST"
         runtime "Release"
         optimize "on"

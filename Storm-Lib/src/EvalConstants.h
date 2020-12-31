@@ -50,7 +50,7 @@ namespace Storm
 
 	constexpr int GameStageMax = 16 * PawnStageWeight + 4 * KnightStageWeight + 4 * BishopStageWeight + 4 * RookStageWeight + 2 * QueenStageWeight + 2 * KingStageWeight;
 
-	constexpr ValueType VALUE_MATE = 100000;
+	constexpr ValueType VALUE_MATE = 30000;
 	constexpr ValueType VALUE_NONE = -VALUE_MATE - 100;
 	constexpr ValueType VALUE_DRAW = 0;
 
@@ -243,6 +243,7 @@ namespace Storm
 
 	constexpr ValueType MinorBehindPawnBonus = 9;
 	constexpr ValueType BishopTargettingCenterBonus = 20;
+	constexpr ValueType BishopPairBonus[GAME_STAGE_MAX] = { 40, 42 };
 
 	constexpr ValueType RookOnOpenFileBonus[2][GAME_STAGE_MAX] = {
 		{ 27, 5 }, // OPEN_FILE
@@ -270,6 +271,9 @@ namespace Storm
 	extern BitBoard SupportedPawnMasks[COLOR_MAX][SQUARE_MAX];
 	constexpr ValueType SupportedPassedPawn[GAME_STAGE_MAX] = { 35, 70 };
 	constexpr ValueType DoubledPawnPenalty[GAME_STAGE_MAX] = { 8, 24 };
+
+	constexpr ValueType ThreatByProtectedPawn[GAME_STAGE_MAX] = { 55, 45 };
+	constexpr ValueType ThreatByProtectedPushedPawn[GAME_STAGE_MAX] = { 14, 13 };
 
 	constexpr ValueType PassedPawnWeights[RANK_MAX][GAME_STAGE_MAX] = {
 		{   0,   0 }, // RANK 1
@@ -319,11 +323,16 @@ namespace Storm
 	};
 
 	constexpr int PawnAttackWeight = 0;
-	constexpr int KnightAttackWeight = 8;
-	constexpr int BishopAttackWeight = 3;
-	constexpr int RookAttackWeight = 3;
-	constexpr int QueenAttackWeight = 5;
+	constexpr int KnightAttackWeight = 1;
+	constexpr int BishopAttackWeight = 1;
+	constexpr int RookAttackWeight = 1;
+	constexpr int QueenAttackWeight = 1;
 	constexpr int KingAttackWeight = 0;
+	constexpr int CheckThreatWeight = 1;
+	constexpr int SafeCheckWeight = 3;
+
+	constexpr int MaxAttackerCount = 8;
+	constexpr int AttackerCountScaling[MaxAttackerCount] = { 0, 3, 7, 12, 16, 18, 19, 20 };
 
 	constexpr int AttackWeights[PIECE_COUNT] = {
 		PawnAttackWeight,

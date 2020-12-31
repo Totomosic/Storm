@@ -152,10 +152,12 @@ namespace Storm
 		return SquareIndex(63 - __builtin_clzll(board));
 	}
 
+#ifndef EMSCRIPTEN
 	inline BitBoard FlipVertically(BitBoard board)
 	{
 		return BitBoard(__bswap_64(board));
 	}
+#endif
 
 	inline int Popcount(BitBoard board)
 	{

@@ -17,7 +17,7 @@ namespace Storm
 
 		Position m_CurrentPosition;
 		Search m_Search;
-		// BoxfishSettings m_Settings;
+		SearchSettings m_Settings;
 		std::atomic<bool> m_Searching;
 		std::thread m_SearchThread;
 
