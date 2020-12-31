@@ -4,6 +4,22 @@
 
 namespace Storm
 {
+	
+	constexpr BitBoard QueensideMask = FILE_A_BB | FILE_B_BB | FILE_C_BB | FILE_D_BB;
+	constexpr BitBoard KingsideMask = FILE_E_BB | FILE_F_BB | FILE_G_BB | FILE_H_BB;
+
+	// Returns rank relative to WHITE
+	template<Color C>
+	constexpr Rank RelativeRank(Rank rank)
+	{
+		return C == COLOR_WHITE ? rank : Rank(RANK_MAX - rank - 1);
+	}
+
+	template<Color C>
+	constexpr Rank RelativeRankBlack(Rank rank)
+	{
+		return C == COLOR_WHITE ? Rank(RANK_MAX - rank - 1) : rank;
+	}
 
 	STORM_API enum GameStage
 	{
@@ -42,7 +58,14 @@ namespace Storm
 	// INITIATIVE
 	// =======================================================================================================================================================================================
 
-	constexpr ValueType Initiative = 10;
+	constexpr ValueType InitiativeBonuses[4] = {
+		4,
+		66,
+		71,
+		89,
+	};
+
+	constexpr ValueType Tempo = 10;
 
 	// =======================================================================================================================================================================================
 	// MATERIAL
@@ -184,12 +207,69 @@ namespace Storm
 	};
 
 	// =======================================================================================================================================================================================
-	// PASSED PAWNS
+	// MOBILITY + PIECES + THREATS
+	// =======================================================================================================================================================================================
+
+	constexpr ValueType MobilityWeights[PIECE_COUNT][GAME_STAGE_MAX] = {
+		{ 0, 0 }, // PIECE_PAWN
+		{ 4, 4 }, // PIECE_KNIGHT
+		{ 3, 3 }, // PIECE_BISHOP
+		{ 2, 1 }, // PIECE_ROOK
+		{ 1, 2 }, // PIECE_QUEEN
+		{ 0, 0 }, // PIECE_KING
+	};
+
+	constexpr int MobilityOffsets[PIECE_COUNT] = {
+		0,  // PIECE_PAWN
+		3,  // PIECE_KNIGHT
+		6,  // PIECE_BISHOP
+		6,  // PIECE_ROOK
+		12, // PIECE_QUEEN
+		0,  // PIECE_KING
+	};
+
+	constexpr ValueType OutpostBonus[2] = {
+		30, // PIECE_KNIGHT
+		20, // PIECE_BISHOP
+	};
+
+	constexpr BitBoard CenterFiles = (FILE_C_BB | FILE_D_BB | FILE_E_BB | FILE_F_BB);
+	constexpr BitBoard OutpostZone[COLOR_MAX] = {
+		CenterFiles & (RANK_4_BB | RANK_5_BB | RANK_6_BB), // COLOR_WHITE
+		CenterFiles & (RANK_5_BB | RANK_4_BB | RANK_3_BB), // COLOR_BLACK
+	};
+
+	constexpr BitBoard Center = (FILE_D_BB | FILE_E_BB) & (RANK_4_BB | RANK_5_BB);
+
+	constexpr ValueType MinorBehindPawnBonus = 9;
+	constexpr ValueType BishopTargettingCenterBonus = 20;
+
+	constexpr ValueType RookOnOpenFileBonus[2][GAME_STAGE_MAX] = {
+		{ 27, 5 }, // OPEN_FILE
+		{ 13, 2 }, // SEMI_OPEN_FILE
+	};
+
+	constexpr ValueType QueenXRayed[GAME_STAGE_MAX] = {
+		-25,
+		-5,
+	};
+
+	// Threats[AttackingPiece][AttackedPiece][STAGE]
+	constexpr ValueType Threats[PIECE_COUNT - 3][PIECE_COUNT - 1][GAME_STAGE_MAX] = {
+		//   PAWN       KNIGHT      BISHOP       ROOK       QUEEN
+		{ { -2, 16 }, { -5,  3 }, { 26, 32 }, { 58, 18 }, { 28,  2 } }, // PIECE_KNIGHT
+		{ {  5, 12 }, { 23, 34 }, {  6, 21 }, { 46, 22 }, { 38, 35 } }, // PIECE_BISHOP
+		{ {  3, 16 }, { 21, 24 }, { 21, 33 }, {  6, 10 }, { 29, 19 } }, // PIECE_ROOK
+	};
+
+	// =======================================================================================================================================================================================
+	// PAWNS
 	// =======================================================================================================================================================================================
 
 	extern BitBoard PassedPawnMasks[COLOR_MAX][SQUARE_MAX];
 	extern BitBoard SupportedPawnMasks[COLOR_MAX][SQUARE_MAX];
 	constexpr ValueType SupportedPassedPawn[GAME_STAGE_MAX] = { 35, 70 };
+	constexpr ValueType DoubledPawnPenalty[GAME_STAGE_MAX] = { 8, 24 };
 
 	constexpr ValueType PassedPawnWeights[RANK_MAX][GAME_STAGE_MAX] = {
 		{   0,   0 }, // RANK 1
@@ -259,6 +339,43 @@ namespace Storm
 		return AttackWeights[piece - PIECE_START];
 	}
 
+	constexpr ValueType PawnShield[SQUARE_MAX] = {
+		0,   0,   0,   0,   0,   0,   0,   0,
+		0,  20,  22,  10,   8,  22,  12,   3,
+	   11,  21,  -5,   4,   7,   4,   7,  13,
+		2,  -3,  -4,   3,   1,  -5,  -9,   7,
+		4, -16,   6,  -3, -10,   1,  -9,  -3,
+	   36,  84,  53, -18, -34,  -9,  23,  -4,
+	   42,  47,  95,  37,  73,  36,   5, -29,
+	  -32, -34, -15,  -6,  -5, -11, -22, -29,
+	};
+
+	// PawnStorm[Unopposed][SQUARE]
+	constexpr ValueType PawnStorm[2][SQUARE_MAX] = {
+		// Unopposed
+		{
+			0,   0,   0,   0,   0,   0,   0,   0,
+			0,   0,   0,   0,   0,   0,   0,   0,
+		  -37, -58, -15, -30, -30,  -7, -32,  -8,
+		   28,  -4, -12, -14,   0,  -1,   6,  25,
+		   21,   2,  -3,   1,   9,  -5,  -5,   8,
+		   16,  34,   0,   4,  15,  -8,   8,   9,
+		   11,  27,   2,   2,   3,   6,   0,   7,
+			0,   0,   0,   0,   0,   0,   0,   0
+		},
+		// Opposed
+		{
+			0,   0,   0,   0,   0,   0,   0,   0,
+		   57,  22, -26,  17, -54, -45,  20,  83,
+		  -20,-124, -82, -11, -58, -94, -79, -28,
+		  -20,  -1, -34, -22, -16, -18,  -6, -16,
+		   11,  16, -16, -10,  -9,  -7,   4,  -5,
+			9,  45,   6,   6,   8,   3,  27,  21,
+		   28,  30,   3,   4,  -3,  11,  11,  14,
+			0,   0,   0,   0,   0,   0,   0,   0
+		}
+	};
+
 	// Pawns can never be on the 8th rank (1st rank used as a sentinel for when there is no pawn)
 	constexpr ValueType KingShieldStength[FILE_MAX / 2][RANK_MAX] = {
 		{ -3, 40, 45, 26, 20, 9, 13 },
@@ -282,12 +399,10 @@ namespace Storm
 	// =======================================================================================================================================================================================
 	// SPACE
 	// =======================================================================================================================================================================================
-
-	constexpr BitBoard CenterFiles = (FILE_C_BB | FILE_D_BB | FILE_E_BB | FILE_F_BB);
 	
 	constexpr ValueType GetSpaceValue(int piecesCount, int safeCount)
 	{
-		return safeCount * piecesCount * piecesCount / 30;
+		return safeCount * safeCount * piecesCount / 30;
 	}
 
 }

@@ -129,6 +129,28 @@ namespace Storm
 	
 	STORM_DEFINE_INC_OPERATORS(Piece);
 
+	enum ColorPiece : uint8_t
+	{
+		COLOR_PIECE_NONE = 0b0000,
+		WHITE_PAWN = 0b0010, WHITE_KNIGHT = 0b0100, WHITE_BISHOP = 0b0110, WHITE_ROOK = 0b1000, WHITE_QUEEN = 0b1010, WHITE_KING = 0b1100,
+		BLACK_PAWN = 0b0011, BLACK_KNIGHT = 0b0101, BLACK_BISHOP = 0b0111, BLACK_ROOK = 0b1001, BLACK_QUEEN = 0b1011, BLACK_KING = 0b1101,
+	};
+
+	constexpr ColorPiece CreatePiece(Piece type, Color color)
+	{
+		return ColorPiece(((type) << 1) | (color & 0x1));
+	}
+
+	constexpr Piece TypeOf(ColorPiece piece)
+	{
+		return Piece(piece >> 1);
+	}
+
+	constexpr Color ColorOf(ColorPiece piece)
+	{
+		return Color(piece & 0x1);
+	}
+
 	enum Direction : int8_t
 	{
 		NORTH,

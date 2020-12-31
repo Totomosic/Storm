@@ -10,7 +10,7 @@ namespace Storm
 
 	static constexpr uint32_t s_Seed = 0x412FDA8F;//0xDABDABDA;
 
-	uint64_t s_PieceOnSquare[COLOR_MAX][PIECE_MAX][FILE_MAX * RANK_MAX];
+	uint64_t s_PieceOnSquare[COLOR_MAX][PIECE_MAX][SQUARE_MAX];
 	uint64_t s_BlackToMove;
 	uint64_t s_CastlingRights[4];
 	uint64_t s_EnPassantFile[FILE_MAX];
@@ -25,7 +25,7 @@ namespace Storm
 
 			for (Piece piece = PIECE_PAWN; piece < PIECE_MAX; piece++)
 			{
-				for (SquareIndex index = a1; index < FILE_MAX * RANK_MAX; index++)
+				for (SquareIndex index = a1; index < SQUARE_MAX; index++)
 				{
 					s_PieceOnSquare[COLOR_WHITE][piece][index] = dist(mt);
 					s_PieceOnSquare[COLOR_BLACK][piece][index] = dist(mt);

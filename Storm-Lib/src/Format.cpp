@@ -58,6 +58,8 @@ namespace Storm
 
     std::string UCI::FormatMove(Move move)
     {
+        if (move == MOVE_NONE)
+            return "(none)";
         SquareIndex from = GetFromSquare(move);
         SquareIndex to = GetToSquare(move);
         Piece promotion = GetPromotionPiece(move);
@@ -100,7 +102,7 @@ namespace Storm
                 break;
             }
         }
-        if (position.GetPieceOnSquare(CreateSquare(startFile, startRank)) == PIECE_KING && startFile == FILE_E && (endFile == FILE_C || endFile == FILE_G))
+        if (TypeOf(position.GetPieceOnSquare(CreateSquare(startFile, startRank))) == PIECE_KING && startFile == FILE_E && (endFile == FILE_C || endFile == FILE_G))
             return CreateMove(CreateSquare(startFile, startRank), CreateSquare(endFile, endRank), CASTLE);
         if (promotion != PIECE_NONE && endRank == GetPromotionRank(position.ColorToMove))
             return CreateMove(CreateSquare(startFile, startRank), CreateSquare(endFile, endRank), promotion);

@@ -9,10 +9,9 @@ namespace Storm
 	// UTILS
 	// =======================================================================================================================================================================================
 
-	template<Color C>
-	constexpr Rank RelativeRank(Rank rank)
+	constexpr int SignOf(ValueType value)
 	{
-		return C == COLOR_WHITE ? rank : Rank(RANK_MAX - rank - 1);
+		return int((value > 0) - (value < 0));
 	}
 
 	template<Color C>
@@ -52,6 +51,8 @@ namespace Storm
 		// Includes PIECE_ALL
 		BitBoard AttackedBy[COLOR_MAX][PIECE_MAX + 2];
 		BitBoard AttackedByTwice[COLOR_MAX];
+
+		BitBoard MobilityArea[COLOR_MAX];
 	};
 
 	struct STORM_API EvaluationResult
@@ -65,13 +66,14 @@ namespace Storm
 		ValueType Queens[COLOR_MAX][GAME_STAGE_MAX];
 		ValueType KingSafety[COLOR_MAX][GAME_STAGE_MAX];
 		ValueType Space[COLOR_MAX][GAME_STAGE_MAX];
+		ValueType Initiative;
 		int Stage;
 
 	public:
 		template<Color C, GameStage S>
 		inline ValueType GetTotal() const
 		{
-			return
+			ValueType eval =
 				Material[C][S] +
 				Pawns[C][S] +
 				Knights[C][S] +
@@ -80,6 +82,11 @@ namespace Storm
 				Queens[C][S] +
 				KingSafety[C][S] +
 				Space[C][S];
+			if constexpr (S == ENDGAME)
+			{
+				eval += SignOf(eval) * std::max(Initiative, -std::abs(eval));
+			}
+			return eval;
 		}
 
 		template<GameStage S>
@@ -93,7 +100,11 @@ namespace Storm
 			ValueType mg = GetStageTotal<MIDGAME>();
 			ValueType eg = GetStageTotal<ENDGAME>();
 			ValueType result = (mg * (GameStageMax - Stage) + eg * Stage) / GameStageMax;
-			return (sideToMove == COLOR_WHITE ? result : -result) + Initiative;
+
+			constexpr SquareIndex index = CreateSquare(FILE_B, RANK_7);
+			constexpr ValueType value = PawnShield[index];
+
+			return (sideToMove == COLOR_WHITE ? result : -result) + Tempo;
 		}
 
 		template<Color C, Piece PIECE>
