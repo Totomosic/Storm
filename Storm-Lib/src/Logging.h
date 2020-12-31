@@ -29,7 +29,7 @@ namespace Storm
 
 #endif
 
-#ifdef STORM_DIST 
+#if defined(STORM_DIST) || defined(EMSCRIPTEN)
 #define STORM_TRACE(...)
 #define STORM_INFO(...)
 #define STORM_WARN(...)

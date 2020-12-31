@@ -11,10 +11,8 @@ namespace Storm
 		PROMOTION,
 	};
 
-	STORM_API enum Move : uint16_t
-	{
-		MOVE_NONE = 0,
-	};
+	using Move = uint16_t;
+	constexpr Move MOVE_NONE = 0;
 
 	constexpr Move CreateMove(SquareIndex from, SquareIndex to)
 	{

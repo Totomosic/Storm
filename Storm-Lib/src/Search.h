@@ -5,6 +5,7 @@
 #include "Evaluation.h"
 #include "TranspositionTable.h"
 #include "SearchConstants.h"
+#include "SearchData.h"
 
 #include <atomic>
 #include <chrono>
@@ -14,114 +15,23 @@ namespace Storm
 
 	void InitSearch();
 
-	struct STORM_API SearchLimits
+	struct STORM_API SearchSettings
 	{
 	public:
-		bool Infinite = false;
-		int Depth = -1;
-		int Milliseconds = -1;
-		int Nodes = -1;
+		int MultiPv = 1;
+		int SkillLevel = 20;
 	};
 
-	struct STORM_API SearchStack
+	struct STORM_API SearchResult
 	{
 	public:
-		int Ply;
-		Move* PV;
-		Move Killers[2];
-		Move CurrentMove;
-		ValueType StaticEvaluation;
-		ZobristHash* PositionHistory;
-		int MoveCount;
-		Move SkipMove = MOVE_NONE;
-		Storm::Position Position;
-	};
-
-	class STORM_API RootMove
-	{
-	public:
-		std::vector<Move> Pv;
+		std::vector<Move> PV;
 		ValueType Score;
+		Move BestMove;
+		int PVIndex;
+		int Depth;
 		int SelDepth;
-
-	public:
-		inline bool operator==(Move move) const
-		{
-			return move == Pv[0];
-		}
-
-		inline friend bool operator<(const RootMove& left, const RootMove& right)
-		{
-			return right.Score < left.Score;
-		}
 	};
-
-	constexpr int P_LIMIT = 16;
-	using CounterMoveTable = Move[SQUARE_MAX][SQUARE_MAX];
-	using HistoryTable = int16_t[COLOR_MAX][SQUARE_MAX][SQUARE_MAX];
-	using CounterMoveHistoryTable = int16_t[P_LIMIT][SQUARE_MAX][P_LIMIT * SQUARE_MAX];
-
-	constexpr int MaxCmhPly = 2;
-
-	struct STORM_API SearchTables
-	{
-	public:
-		CounterMoveTable CounterMoves;
-		HistoryTable History;
-		CounterMoveHistoryTable CounterMoveHistory;
-	};
-
-	inline void SetCounterMoveHistoryPointer(int16_t** cmhPtr, SearchStack* stack, CounterMoveHistoryTable* cmhTable, int ply)
-	{
-		for (int i = 0; i < MaxCmhPly; i++)
-		{
-			SearchStack* ss = stack - i;
-			if (ply > i && ss->CurrentMove != MOVE_NONE)
-			{
-				SquareIndex to = GetToSquare(ss->CurrentMove);
-				cmhPtr[i] = (*cmhTable)[ss->Position.GetPieceOnSquare(to)][to];
-			}
-			else
-				cmhPtr[i] = nullptr;
-		}
-	}
-
-	inline ValueType GetHistoryScore(SearchStack* stack, const Position& position, int16_t** cmhPtr, Move move, const SearchTables* tables)
-	{
-		SquareIndex from = GetFromSquare(move);
-		SquareIndex to = GetToSquare(move);
-
-		ValueType score = tables->History[position.ColorToMove][from][to];
-		if (cmhPtr)
-		{
-			int piecePosition = position.GetPieceOnSquare(from) * SQUARE_MAX + to;
-			for (int i = 0; i < MaxCmhPly; i++)
-			{
-				if (cmhPtr[i] != nullptr)
-					score += cmhPtr[i][piecePosition];
-			}
-		}
-		return score;
-	}
-
-	inline void AddToHistory(SearchStack* stack, int16_t** cmhPtr, SearchTables* tables, Move move, ValueType score)
-	{
-		SquareIndex from = GetFromSquare(move);
-		SquareIndex to = GetToSquare(move);
-		int piecePosition = stack->Position.GetPieceOnSquare(from) * SQUARE_MAX + to;
-
-		int16_t* item = &tables->History[stack->Position.ColorToMove][from][to];
-		*item += score - (*item) * std::abs(score) / MAX_HISTORY_SCORE;
-
-		for (int i = 0; i < MaxCmhPly; i++)
-		{
-			if (cmhPtr[i] != nullptr)
-			{
-				item = &cmhPtr[i][piecePosition];
-				*item += score = (*item) * std::abs(score) / MAX_HISTORY_SCORE;
-			}
-		}
-	}
 
 	class STORM_API Search
 	{
@@ -135,11 +45,13 @@ namespace Storm
 	private:
 		TranspositionTable m_TranspositionTable;
 		std::vector<ZobristHash> m_PositionHistory;
+		SearchSettings m_Settings;
 
 		bool m_Log;
 		SearchLimits m_Limits;
 		std::vector<RootMove> m_RootMoves;
 		size_t m_Nodes;
+		int m_PvIndex;
 
 		std::chrono::time_point<std::chrono::high_resolution_clock> m_StartRootTime;
 		std::chrono::time_point<std::chrono::high_resolution_clock> m_StartSearchTime;
@@ -151,18 +63,22 @@ namespace Storm
 	public:
 		Search(size_t ttSize, bool log = true);
 
+		inline const SearchSettings& GetSettings() const { return m_Settings; }
+		void SetSettings(const SearchSettings& settings);
 		void PushPosition(const ZobristHash& hash);
 
 		size_t Perft(const Position& position, int depth);
-		void Ponder(const Position& position, SearchLimits limits = {});
+		void Ponder(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback = {});
+		void Ponder(const Position& position, const std::function<void(const SearchResult&)>& callback = {});
 		Move SearchBestMove(const Position& position, SearchLimits limits);
+		Move SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback);
 
 		void Stop();
 
 	private:
 		size_t PerftPosition(Position& position, int depth);
 
-		RootMove SearchRoot(Position& position, int depth);
+		RootMove SearchRoot(Position& position, int depth, const std::function<void(const SearchResult&)>& callback);
 		template<NodeType NT>
 		ValueType SearchPosition(Position& position, SearchStack* stack, int depth, ValueType alpha, ValueType beta, int& selDepth, bool cutNode);
 		template<NodeType NT>
@@ -187,6 +103,8 @@ namespace Storm
 		constexpr bool IsMateScore(ValueType score) const { return score >= MateIn(MAX_PLY) || score <= MatedIn(MAX_PLY); }
 		bool CheckLimits() const;
 		std::vector<RootMove> GenerateRootMoves(const Position& position) const;
+
+		SearchStack* InitStack(SearchStack* stack, int count, const Position& position, Move* pv, ZobristHash* history) const;
 
 		template<typename T, size_t Width, size_t Height>
 		void ClearTable(T table[Width][Height], T value)

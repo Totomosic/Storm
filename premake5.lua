@@ -40,3 +40,5 @@ else
         include ("Storm-Swig")
     end
 end
+
+include ("Storm-Emscripten")

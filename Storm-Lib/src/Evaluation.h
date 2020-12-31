@@ -47,6 +47,7 @@ namespace Storm
 		BitBoard KingAttackZone[COLOR_MAX];
 		int AttackerCount[COLOR_MAX];
 		int AttackUnits[COLOR_MAX];
+		BitBoard CheckSquares[COLOR_MAX];
 
 		// Includes PIECE_ALL
 		BitBoard AttackedBy[COLOR_MAX][PIECE_MAX + 2];

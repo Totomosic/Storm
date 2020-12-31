@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-#include "BitBoard.h"
+#include "Bitboard.h"
 #include "ZobristHash.h"
 #include "Move.h"
 
@@ -89,7 +89,8 @@ namespace Storm
 
 		inline Piece GetMovingPiece(Move move) const { return TypeOf(GetPieceOnSquare(GetFromSquare(move))); }
 		inline Piece GetCapturedPiece(Move move) const { return TypeOf(GetPieceOnSquare(GetToSquare(move))); }
-		inline bool IsCapture(Move move) const { return GetPieceOnSquare(GetToSquare(move)) != COLOR_PIECE_NONE; }
+		inline bool IsCapture(Move move) const { return GetPieceOnSquare(GetToSquare(move)) != COLOR_PIECE_NONE || IsEnpassant(move); }
+		inline bool IsEnpassant(Move move) const { return TypeOf(GetPieceOnSquare(GetFromSquare(move))) == PIECE_PAWN && GetToSquare(move) == EnpassantSquare; }
 
 		bool GivesCheck(Move move) const;
 		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);

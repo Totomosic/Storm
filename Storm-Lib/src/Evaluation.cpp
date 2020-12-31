@@ -85,6 +85,8 @@ namespace Storm
 	template<Color C>
 	void EvaluatePawns(const Position& position, EvaluationResult& result, const EvaluationData& data)
 	{
+		constexpr Direction Up = C == COLOR_WHITE ? NORTH : SOUTH;
+
 		ValueType mg = 0;
 		ValueType eg = 0;
 
@@ -108,6 +110,20 @@ namespace Storm
 				}
 			}
 		}
+
+		BitBoard safeArea = data.AttackedBy[C][PIECE_ALL] & ~data.AttackedBy[OtherColor(C)][PIECE_ALL];
+		BitBoard safePawnAttacks = GetPawnAttacks<C>(position.GetPieces(C, PIECE_PAWN) & safeArea);
+		BitBoard nonPawnEnemies = position.GetPieces(OtherColor(C)) & ~position.GetPieces(OtherColor(C), PIECE_PAWN);
+		int threatenedPieces = Popcount(nonPawnEnemies & safePawnAttacks);
+
+		mg += threatenedPieces * ThreatByProtectedPawn[MIDGAME];
+		eg += threatenedPieces * ThreatByProtectedPawn[ENDGAME];
+
+		BitBoard pushedSafePawnAttacks = GetPawnAttacks<C>(Shift<Up>(position.GetPieces(C, PIECE_PAWN)) & safeArea);
+		int threatenedByPush = Popcount(nonPawnEnemies & pushedSafePawnAttacks);
+
+		mg += threatenedByPush * ThreatByProtectedPushedPawn[MIDGAME];
+		eg += threatenedByPush * ThreatByProtectedPushedPawn[ENDGAME];
 
 		for (File file = FILE_A; file < FILE_MAX; file++)
 		{
@@ -161,6 +177,22 @@ namespace Storm
 		}
 
 		BitBoard pieces = position.GetPieces(C, P);
+
+		if constexpr (P == PIECE_BISHOP)
+		{
+			if (MoreThanOne(pieces))
+			{
+				mg += BishopPairBonus[MIDGAME];
+				eg += BishopPairBonus[ENDGAME];
+			}
+		}
+
+		BitBoard checkSquares = 
+			P == PIECE_KNIGHT ? GetAttacks<PIECE_KNIGHT>(position.GetKingSquare(OtherColor(C))) :
+			P == PIECE_BISHOP ? GetAttacks<PIECE_BISHOP>(position.GetKingSquare(OtherColor(C)), position.GetPieces()) :
+			P == PIECE_ROOK ? GetAttacks<PIECE_ROOK>(position.GetKingSquare(OtherColor(C)), position.GetPieces()) :
+			P == PIECE_QUEEN ? GetAttacks<PIECE_QUEEN>(position.GetKingSquare(OtherColor(C)), position.GetPieces()) : ZERO_BB;
+
 		while (pieces)
 		{
 			result.Stage -= GameStageWeights[P - PIECE_START];
@@ -205,7 +237,7 @@ namespace Storm
 					eg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1] / 2;
 				}
 
-				if (Shift<Down>(position.GetPieces(PIECE_PAWN)) & square)
+				if (Shift<Down>(position.GetPieces(C, PIECE_PAWN)) & square)
 					mg += MinorBehindPawnBonus;
 
 				if constexpr (P == PIECE_BISHOP)
@@ -230,17 +262,24 @@ namespace Storm
 				}
 			}
 
-			BitBoard kingAttacks = attacks & data.KingAttackZone[OtherColor(C)];
-			int attackCount = Popcount(kingAttacks);
-			data.AttackerCount[C] += bool(attackCount);
-			data.AttackUnits[C] += attackCount * GetAttackWeight(P);
+			BitBoard kingAttacks = attacks & (data.KingAttackZone[OtherColor(C)] | checkSquares);
+			if (kingAttacks)
+			{
+				int attackCount = Popcount(kingAttacks & data.KingAttackZone[OtherColor(C)]);
+				data.AttackerCount[C]++;
+				data.AttackUnits[C] += attackCount * GetAttackWeight(P);
+
+				BitBoard checkingMoves = attacks & checkSquares;
+				data.CheckSquares[C] |= checkingMoves;
+				data.AttackUnits[C] += Popcount(checkingMoves) * CheckThreatWeight;
+			}
 		}
 
 		result.SetPieceEval<C, P>(mg, eg);
 	}
 
 	template<Color C>
-	void EvaluateKingSafety(const Position& position, EvaluationResult& result, const EvaluationData& data)
+	void EvaluateKingSafety(const Position& position, EvaluationResult& result, EvaluationData& data)
 	{
 		ValueType mg = 0;
 		ValueType eg = 0;
@@ -249,13 +288,22 @@ namespace Storm
 		File kingFile = FileOf(kingSquare);
 		Rank kingRank = RankOf(kingSquare);
 
+		BitBoard safeChecks = data.CheckSquares[OtherColor(C)] & ~position.GetPieces(OtherColor(C));
+		safeChecks &= ~data.AttackedBy[C][PIECE_ALL] | (data.AttackedByTwice[OtherColor(C)] & ~data.AttackedByTwice[C] & (data.AttackedBy[C][PIECE_KING] | data.AttackedBy[C][PIECE_QUEEN]));
+		if (safeChecks)
+		{
+			data.AttackerCount[OtherColor(C)]++;
+			data.AttackUnits[OtherColor(C)] += Popcount(safeChecks) * SafeCheckWeight;
+		}
+
 		if (data.AttackerCount[OtherColor(C)] >= 2)
 		{
-			ValueType danger = KingSafetyTable[std::min(data.AttackUnits[OtherColor(C)], MAX_ATTACK_UNITS - 1)];
+			ValueType danger = data.AttackUnits[OtherColor(C)] * data.AttackUnits[OtherColor(C)] * AttackerCountScaling[std::min(data.AttackerCount[OtherColor(C)], MaxAttackerCount - 1)] / MaxAttackerCount;
+			// KingSafetyTable[std::min(data.AttackUnits[OtherColor(C)], MAX_ATTACK_UNITS - 1)];
 			if (!position.GetPieces(OtherColor(C), PIECE_QUEEN))
 				danger = std::max(danger - 200, 0);
 			mg -= danger;
-			eg -= danger / 2;
+			eg -= danger / 4;
 		}
 
 		const BitBoard pawnMask = InFrontOrEqual<C>(kingRank);
@@ -264,20 +312,6 @@ namespace Storm
 		File kingFileCenter = std::clamp(kingFile, FILE_B, FILE_G);
 		for (File file = File(kingFileCenter - 1); file <= kingFileCenter + 1; file++)
 		{
-			/*// Only include pawns in front of our king
-			BitBoard ourPawns = FILE_MASKS[file] & position.GetPieces(C, PIECE_PAWN) & pawnMask & ~data.AttackedBy[OtherColor(C)][PIECE_PAWN];
-			BitBoard theirPawns = FILE_MASKS[file] & position.GetPieces(OtherColor(C), PIECE_PAWN) & pawnMask;
-
-			Rank ourRank = ourPawns ? RelativeRank<C>(RankOf(FrontmostSquare<OtherColor(C)>(ourPawns))) : RANK_1;
-			Rank theirRank = theirPawns ? RelativeRank<C>(RankOf(FrontmostSquare<OtherColor(C)>(theirPawns))) : RANK_1;
-
-			int distance = std::min<int>(file, FILE_MAX - file - 1);
-			mg += KingShieldStength[distance][ourRank];
-			if (ourRank > 0 && ourRank == theirRank - 1)
-				mg -= BlockedStormStrength[theirRank];
-			else
-				mg -= PawnStormStrength[distance][theirRank];*/
-
 			BitBoard pawns = position.GetPieces(C, PIECE_PAWN) & FILE_MASKS[file] & pawnMask;
 			if (pawns)
 			{
@@ -340,6 +374,7 @@ namespace Storm
 		data.KingAttackZone[C] = GetKingAttackZone<C>(position);
 		data.AttackerCount[C] = 0;
 		data.AttackUnits[C] = 0;
+		data.CheckSquares[C] = ZERO_BB;
 
 		data.AttackedBy[C][PIECE_KING] = GetAttacks<PIECE_KING>(position.GetKingSquare(C));
 		data.AttackedBy[C][PIECE_PAWN] = GetPawnAttacks<C>(position.GetPieces(C, PIECE_PAWN));
@@ -368,9 +403,6 @@ namespace Storm
 		EvaluateMaterial<COLOR_WHITE>(position, result);
 		EvaluateMaterial<COLOR_BLACK>(position, result);
 
-		EvaluatePawns<COLOR_WHITE>(position, result, data);
-		EvaluatePawns<COLOR_BLACK>(position, result, data);
-
 		EvaluatePieces<COLOR_WHITE, PIECE_KNIGHT>(position, result, data);
 		EvaluatePieces<COLOR_BLACK, PIECE_KNIGHT>(position, result, data);
 		EvaluatePieces<COLOR_WHITE, PIECE_BISHOP>(position, result, data);
@@ -379,6 +411,9 @@ namespace Storm
 		EvaluatePieces<COLOR_BLACK, PIECE_ROOK>(position, result, data);
 		EvaluatePieces<COLOR_WHITE, PIECE_QUEEN>(position, result, data);
 		EvaluatePieces<COLOR_BLACK, PIECE_QUEEN>(position, result, data);
+
+		EvaluatePawns<COLOR_WHITE>(position, result, data);
+		EvaluatePawns<COLOR_BLACK>(position, result, data);
 
 		EvaluateKingSafety<COLOR_WHITE>(position, result, data);
 		EvaluateKingSafety<COLOR_BLACK>(position, result, data);

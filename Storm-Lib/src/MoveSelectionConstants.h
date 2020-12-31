@@ -2,6 +2,7 @@
 #include "Types.h"
 #include "EvalConstants.h"
 #include "SearchConstants.h"
+#include "SearchData.h"
 
 namespace Storm
 {
