@@ -69,7 +69,7 @@ namespace Storm
 		File file = std::clamp(FileOf(kingSquare), FILE_B, FILE_G);
 		Rank rank = std::clamp(RankOf(kingSquare), RANK_2, RANK_7);
 
-		return GetAttacks<PIECE_KING>(CreateSquare(file, rank));
+		return GetAttacks<PIECE_KING>(CreateSquare(file, rank)) | kingSquare;
 	}
 
 	template<Color C>
@@ -109,17 +109,56 @@ namespace Storm
 			}
 		}
 
+		for (File file = FILE_A; file < FILE_MAX; file++)
+		{
+			if (MoreThanOne(FILE_MASKS[file] & position.GetPieces(C, PIECE_PAWN)))
+			{
+				mg -= DoubledPawnPenalty[MIDGAME];
+				eg -= DoubledPawnPenalty[ENDGAME];
+			}
+		}
+
 		result.Pawns[C][MIDGAME] = mg;
 		result.Pawns[C][ENDGAME] = eg;
 	}
 
 	template<Color C, Piece P>
+	void ScoreThreats(const Position& position, EvaluationData& data, BitBoard attacks, SquareIndex square, ValueType& mg, ValueType& eg)
+	{
+		BitBoard threatenedPieces = attacks & position.GetPieces(OtherColor(C)) & ~position.GetKingSquare(OtherColor(C));
+		while (threatenedPieces)
+		{
+			SquareIndex enemySquare = PopLeastSignificantBit(threatenedPieces);
+			mg += Threats[P - PIECE_START][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][MIDGAME];
+			eg += Threats[P - PIECE_START][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][ENDGAME];
+		}
+	}
+
+	template<Color C, Piece P>
 	void EvaluatePieces(const Position& position, EvaluationResult& result, EvaluationData& data)
 	{
+		constexpr Direction Down = C == COLOR_WHITE ? SOUTH : NORTH;
+
 		ValueType mg = 0;
 		ValueType eg = 0;
 
 		data.AttackedBy[C][P] = ZERO_BB;
+
+		BitBoard outpostSquares;
+		if constexpr (P == PIECE_BISHOP || P == PIECE_KNIGHT)
+		{
+			outpostSquares = data.AttackedBy[C][PIECE_PAWN];
+			outpostSquares &= OutpostZone[C];
+			BitBoard b = outpostSquares;
+			while (b)
+			{
+				SquareIndex square = PopLeastSignificantBit(b);
+				File file = FileOf(square);
+				Rank rank = RankOf(square);
+				if (data.AttackedBy[OtherColor(C)][PIECE_PAWN] & (FILE_MASKS[file] & InFrontOrEqual<C>(rank)))
+					outpostSquares &= ~FILE_MASKS[file];
+			}
+		}
 
 		BitBoard pieces = position.GetPieces(C, P);
 		while (pieces)
@@ -141,6 +180,55 @@ namespace Storm
 			data.AttackedBy[C][P] |= attacks;
 			data.AttackedByTwice[C] |= data.AttackedBy[C][PIECE_ALL] & attacks;
 			data.AttackedBy[C][PIECE_ALL] |= attacks;
+
+			attacks &= data.MobilityArea[C];
+
+			int reachableSquares = Popcount(attacks);
+			mg += MobilityWeights[P - PIECE_START][MIDGAME] * (reachableSquares - MobilityOffsets[P - PIECE_START]);
+			eg += MobilityWeights[P - PIECE_START][ENDGAME] * (reachableSquares - MobilityOffsets[P - PIECE_START]);
+
+			if constexpr (P != PIECE_QUEEN)
+			{
+				ScoreThreats<C, P>(position, data, attacks, square, mg, eg);
+			}
+
+			if constexpr (P == PIECE_BISHOP || P == PIECE_KNIGHT)
+			{
+				if (outpostSquares & square)
+				{
+					mg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1];
+					eg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1];
+				}
+				else if (outpostSquares & attacks)
+				{
+					mg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1] / 2;
+					eg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1] / 2;
+				}
+
+				if (Shift<Down>(position.GetPieces(PIECE_PAWN)) & square)
+					mg += MinorBehindPawnBonus;
+
+				if constexpr (P == PIECE_BISHOP)
+				{
+					if (MoreThanOne(GetAttacks<PIECE_BISHOP>(square, position.GetPieces(PIECE_PAWN)) & Center))
+						mg += BishopTargettingCenterBonus;
+				}
+			}
+			if constexpr (P == PIECE_ROOK)
+			{
+				int pawnCountOnFile = Popcount(FILE_MASKS[FileOf(square)] & position.GetPieces(PIECE_PAWN));
+				mg += RookOnOpenFileBonus[pawnCountOnFile == 0 ? 0 : 1][MIDGAME];
+				eg += RookOnOpenFileBonus[pawnCountOnFile == 0 ? 0 : 1][ENDGAME];
+			}
+			if constexpr (P == PIECE_QUEEN)
+			{
+				BitBoard pinners;
+				if (position.GetSliderBlockers(position.GetPieces(OtherColor(C), PIECE_ROOK, PIECE_BISHOP), square, &pinners))
+				{
+					mg += QueenXRayed[MIDGAME];
+					eg += QueenXRayed[ENDGAME];
+				}
+			}
 
 			BitBoard kingAttacks = attacks & data.KingAttackZone[OtherColor(C)];
 			int attackCount = Popcount(kingAttacks);
@@ -176,7 +264,7 @@ namespace Storm
 		File kingFileCenter = std::clamp(kingFile, FILE_B, FILE_G);
 		for (File file = File(kingFileCenter - 1); file <= kingFileCenter + 1; file++)
 		{
-			// Only include pawns in front of our king
+			/*// Only include pawns in front of our king
 			BitBoard ourPawns = FILE_MASKS[file] & position.GetPieces(C, PIECE_PAWN) & pawnMask & ~data.AttackedBy[OtherColor(C)][PIECE_PAWN];
 			BitBoard theirPawns = FILE_MASKS[file] & position.GetPieces(OtherColor(C), PIECE_PAWN) & pawnMask;
 
@@ -188,7 +276,27 @@ namespace Storm
 			if (ourRank > 0 && ourRank == theirRank - 1)
 				mg -= BlockedStormStrength[theirRank];
 			else
-				mg -= PawnStormStrength[distance][theirRank];
+				mg -= PawnStormStrength[distance][theirRank];*/
+
+			BitBoard pawns = position.GetPieces(C, PIECE_PAWN) & FILE_MASKS[file] & pawnMask;
+			if (pawns)
+			{
+				SquareIndex advancedPawn = FrontmostSquare<C>(pawns);
+
+				// PawnShield indexed relative to black
+				SquareIndex index = CreateSquare(file, RelativeRank<C>(RankOf(advancedPawn)));
+				mg += PawnShield[index];
+				eg += PawnShield[index];
+			}
+
+			BitBoard enemyPawns = position.GetPieces(OtherColor(C), PIECE_PAWN) & FILE_MASKS[file] & pawnMask;
+			while (enemyPawns)
+			{
+				SquareIndex square = PopLeastSignificantBit(enemyPawns);
+				bool unopposed = pawns == ZERO_BB;
+				SquareIndex index = CreateSquare(file, RelativeRank<C>(RankOf(square)));
+				mg += PawnStorm[unopposed][index];
+			}
 		}
 
 		mg += PieceSquareTables[C][PIECE_KING - PIECE_START][MIDGAME][kingSquare];
@@ -239,6 +347,13 @@ namespace Storm
 		data.AttackedBy[C][PIECE_ALL] = data.AttackedBy[C][PIECE_PAWN] | data.AttackedBy[C][PIECE_KING];
 	}
 
+	template<Color C>
+	void PostInitEvaluationData(const Position& position, EvaluationData& data)
+	{
+		data.AttackerCount[C] += data.AttackedBy[C][PIECE_PAWN] & data.KingAttackZone[OtherColor(C)];
+		data.MobilityArea[C] = ~(position.GetPieces(C, PIECE_PAWN) | data.AttackedBy[OtherColor(C)][PIECE_PAWN] | position.GetKingSquare(C));
+	}
+
 	EvaluationResult EvaluateDetailed(const Position& position)
 	{
 		EvaluationResult result;
@@ -247,6 +362,8 @@ namespace Storm
 		EvaluationData data;
 		InitEvaluationData<COLOR_WHITE>(position, data);
 		InitEvaluationData<COLOR_BLACK>(position, data);
+		PostInitEvaluationData<COLOR_WHITE>(position, data);
+		PostInitEvaluationData<COLOR_BLACK>(position, data);
 
 		EvaluateMaterial<COLOR_WHITE>(position, result);
 		EvaluateMaterial<COLOR_BLACK>(position, result);
@@ -268,6 +385,13 @@ namespace Storm
 
 		EvaluateSpace<COLOR_WHITE>(position, result, data);
 		EvaluateSpace<COLOR_BLACK>(position, result, data);
+
+		BitBoard allPawns = position.GetPieces(PIECE_PAWN);
+		result.Initiative =
+			InitiativeBonuses[0] * Popcount(allPawns) +
+			InitiativeBonuses[1] * ((allPawns & QueensideMask) && (allPawns & KingsideMask)) +
+			InitiativeBonuses[2] * (Popcount(position.GetPieces() & ~allPawns) == 2) -
+			InitiativeBonuses[3];
 
 		return result;
 	}

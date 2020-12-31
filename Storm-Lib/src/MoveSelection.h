@@ -6,6 +6,9 @@
 namespace Storm
 {
 
+	struct SearchTables;
+	struct SearchStack;
+
 	STORM_API enum MoveSelectionStage
 	{
 		FIND_TT_MOVE,
@@ -28,7 +31,7 @@ namespace Storm
 	{
 	public:
 		Storm::Move Move;
-		ValueType Value;
+		int16_t Value;
 
 	public:
 		ValueMove() = default;
@@ -61,9 +64,11 @@ namespace Storm
 		Move m_HashMove;
 		Move* m_Killers;
 		Move m_CounterMove;
+		SearchStack* m_Stack;
+		SearchTables* m_Tables;
 
 	public:
-		MoveSelector(const Position& position, Move hashMove, Move counterMove, Move killers[2]);
+		MoveSelector(const Position& position, SearchStack* stack, Move hashMove, Move counterMove, Move killers[2], SearchTables* tables);
 		MoveSelector(const Position& position);
 
 		Move GetNextMove();

@@ -12,7 +12,7 @@ namespace Storm
 		Cache.NonPawnMaterial[COLOR_BLACK] = 0;
 
 		for (SquareIndex sq = a1; sq < SQUARE_MAX; sq++)
-			Cache.PieceOnSquare[sq] = PIECE_NONE;
+			Cache.PieceOnSquare[sq] = COLOR_PIECE_NONE;
 
 		Cache.ColorPieces[COLOR_WHITE] = ZERO_BB;
 		Cache.ColorPieces[COLOR_BLACK] = ZERO_BB;
@@ -37,13 +37,16 @@ namespace Storm
 			while (pieces)
 			{
 				SquareIndex square = PopLeastSignificantBit(pieces);
-				Cache.PieceOnSquare[square] = piece;
+				if (Cache.ColorPieces[COLOR_WHITE] & square)
+					Cache.PieceOnSquare[square] = CreatePiece(piece, COLOR_WHITE);
+				else
+					Cache.PieceOnSquare[square] = CreatePiece(piece, COLOR_BLACK);
 			}
 		}
 
 		Cache.KingSquare[COLOR_WHITE] = LeastSignificantBit(GetPieces(COLOR_WHITE, PIECE_KING));
 		Cache.KingSquare[COLOR_BLACK] = MostSignificantBit(GetPieces(COLOR_BLACK, PIECE_KING));
-		STORM_ASSERT(Cache.KingSquare[COLOR_WHITE] != ZERO_BB && Cache.KingSquare[COLOR_BLACK] != ZERO_BB, "Couldn't find king");
+		STORM_ASSERT(Cache.KingSquare[COLOR_WHITE] != SQUARE_INVALID && Cache.KingSquare[COLOR_BLACK] != SQUARE_INVALID, "Couldn't find king");
 
 		Cache.CheckedBy = GetAttackersTo(GetKingSquare(ColorToMove), OtherColor(ColorToMove), GetPieces());
 
@@ -176,16 +179,6 @@ namespace Storm
 				// Queenside castle
 				MovePiece(ColorToMove, PIECE_ROOK, CreateSquare(FILE_A, toRank), CreateSquare(FILE_D, toRank));
 			}
-			if (Colors[ColorToMove].CastleKingSide)
-			{
-				Hash.RemoveCastleKingside(ColorToMove);
-				Colors[ColorToMove].CastleKingSide = false;
-			}
-			if (Colors[ColorToMove].CastleQueenSide)
-			{
-				Hash.RemoveCastleQueenside(ColorToMove);
-				Colors[ColorToMove].CastleQueenSide = false;
-			}
 		}
 		else
 		{
@@ -242,7 +235,7 @@ namespace Storm
 		STORM_ASSERT(ValidMove(move), "Invalid move");
 		SquareIndex fromSquare = GetFromSquare(move);
 		SquareIndex toSquare = GetToSquare(move);
-		Piece movingPiece = GetPieceOnSquare(fromSquare);
+		Piece movingPiece = TypeOf(GetPieceOnSquare(fromSquare));
 
 		// Direct check
 		if (Cache.CheckSquares[OtherColor(ColorToMove)][movingPiece - PIECE_START] & toSquare)
@@ -293,7 +286,7 @@ namespace Storm
 		SquareIndex kingSquare = GetKingSquare(ColorToMove);
 		SquareIndex fromSquare = GetFromSquare(move);
 		SquareIndex toSquare = GetToSquare(move);
-		Piece movingPiece = GetPieceOnSquare(fromSquare);
+		Piece movingPiece = TypeOf(GetPieceOnSquare(fromSquare));
 		if (toSquare == EnpassantSquare && movingPiece == PIECE_PAWN)
 		{
 			SquareIndex capturedSquare = GetEnpassantSquare(toSquare, ColorToMove);
@@ -358,7 +351,7 @@ namespace Storm
 		*pinners = ZERO_BB;
 		BitBoard snipers = ((GetAttacks<PIECE_ROOK>(toSquare, ZERO_BB) & GetPieces(PIECE_QUEEN, PIECE_ROOK)) | (GetAttacks<PIECE_BISHOP>(toSquare, ZERO_BB) & GetPieces(PIECE_QUEEN, PIECE_BISHOP))) & sliders;
 		BitBoard occupied = GetPieces() ^ snipers;
-		Color color = GetColorAt(toSquare);
+		Color color = GetColorOnSquare(toSquare);
 		while (snipers)
 		{
 			SquareIndex square = PopLeastSignificantBit(snipers);
@@ -399,19 +392,21 @@ namespace Storm
 			return VALUE_DRAW >= threshold;
 		SquareIndex from = GetFromSquare(move);
 		SquareIndex to = GetToSquare(move);
-		Piece captured = GetPieceOnSquare(to);
+		Piece captured = TypeOf(GetPieceOnSquare(to));
 		BitBoard stmAttackers;
 
 		ValueType swap = GetPieceValueMg(captured) - threshold;
 		if (swap < 0)
 			return false;
 
+		ColorPiece movingPiece = GetPieceOnSquare(from);
+
 		// Assume they capture piece for free
-		swap = GetPieceValueMg(GetPieceOnSquare(from)) - swap;
+		swap = GetPieceValueMg(TypeOf(movingPiece)) - swap;
 		if (swap <= 0)
 			return true;
 
-		Color stm = GetColorAt(from);
+		Color stm = ColorOf(movingPiece);
 		BitBoard occupied = GetPieces() ^ from ^ to;
 		BitBoard attackers = GetAttackersTo(to, occupied);
 		BitBoard bb;
@@ -495,8 +490,8 @@ namespace Storm
 		Cache.ColorPieces[color] ^= mask;
 		Cache.AllPieces ^= mask;
 		Cache.PiecesByType[piece] ^= mask;
-		Cache.PieceOnSquare[from] = PIECE_NONE;
-		Cache.PieceOnSquare[to] = piece;
+		Cache.PieceOnSquare[from] = COLOR_PIECE_NONE;
+		Cache.PieceOnSquare[to] = CreatePiece(piece, color);
 
 		Hash.RemovePieceAt(color, piece, from);
 		Hash.AddPieceAt(color, piece, to);
@@ -509,7 +504,7 @@ namespace Storm
 		Cache.ColorPieces[color] |= square;
 		Cache.AllPieces |= square;
 		Cache.PiecesByType[piece] |= square;
-		Cache.PieceOnSquare[square] = piece;
+		Cache.PieceOnSquare[square] = CreatePiece(piece, color);
 		if (piece != PIECE_PAWN)
 		{
 			Cache.NonPawnMaterial[color] += GetPieceValueMg(piece);
@@ -524,7 +519,7 @@ namespace Storm
 		Cache.ColorPieces[color] ^= square;
 		Cache.AllPieces ^= square;
 		Cache.PiecesByType[piece] ^= square;
-		Cache.PieceOnSquare[square] = PIECE_NONE;
+		Cache.PieceOnSquare[square] = COLOR_PIECE_NONE;
 		if (piece != PIECE_PAWN)
 		{
 			Cache.NonPawnMaterial[color] -= GetPieceValueEg(piece);
@@ -735,8 +730,9 @@ namespace Storm
 			for (File file = FILE_A; file < FILE_MAX; file++)
 			{
 				char pieceFEN = 0;
-				Piece piece = position.GetPieceOnSquare(CreateSquare(file, rank));
-				Color c = position.GetColorAt(CreateSquare(file, rank));
+				ColorPiece colorPiece = position.GetPieceOnSquare(CreateSquare(file, rank));
+				Piece piece = TypeOf(colorPiece);
+				Color c = ColorOf(colorPiece);
 				if (piece != PIECE_NONE)
 					pieceFEN = UCI::PieceToString(piece, c);
 				if (pieceFEN != 0)
@@ -806,11 +802,10 @@ namespace Storm
 			{
 				char pieceFen = ' ';
 				SquareIndex square = CreateSquare(file, rank);
-				Piece piece = position.GetPieceOnSquare(square);
-				if (piece != PIECE_NONE)
+				ColorPiece piece = position.GetPieceOnSquare(square);
+				if (piece != COLOR_PIECE_NONE)
 				{
-					Color color = position.GetColorAt(square);
-					pieceFen = UCI::PieceToString(piece, color);
+					pieceFen = UCI::PieceToString(TypeOf(piece), ColorOf(piece));
 				}
 				stream << ' ' << pieceFen << " |";
 			}

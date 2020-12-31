@@ -5,6 +5,7 @@
 namespace Storm
 {
 
+	constexpr int16_t MAX_HISTORY_SCORE = 1 << 13;
 	constexpr int MAX_PLY = 100;
 
 	constexpr int AspirationWindowDepth = 4;
@@ -33,6 +34,24 @@ namespace Storm
 	inline int GetLmrReduction(bool improving, int depth, int moveIndex)
 	{
 		return std::max(LmrReductions[depth][moveIndex] - IsPvNode - improving, 0);
+	}
+
+	constexpr int SingularExtensionDepth = 7;
+	constexpr int SingularDepthTolerance = 3;
+
+	constexpr int GetSingularDepth(int depth)
+	{
+		return depth / 2;
+	}
+
+	constexpr ValueType GetSingularBeta(ValueType value, int depth)
+	{
+		return value - 2 * depth;
+	}
+
+	constexpr int16_t GetHistoryValue(int depth)
+	{
+		return (std::min(depth, 16) * std::min(depth, 16)) * 32;
 	}
 
 }

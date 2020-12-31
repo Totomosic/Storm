@@ -137,7 +137,7 @@ namespace Storm
 
 	inline int Popcount(BitBoard board)
 	{
-		return int(__builtin_popcountll(board));
+		return int(__popcnt64(board));
 	}
 #elif STORM_PLATFORM_LINUX
 	inline SquareIndex LeastSignificantBit(BitBoard board)

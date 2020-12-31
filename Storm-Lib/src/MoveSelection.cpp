@@ -1,12 +1,13 @@
 #include "MoveSelection.h"
 #include "Position.h"
+#include "Search.h"
 
 namespace Storm
 {
 
 	template<MoveSelectorType TYPE>
-	MoveSelector<TYPE>::MoveSelector(const Position& position, Move hashMove, Move counterMove, Move killers[2])
-		: m_Stage(FIND_TT_MOVE), m_Position(position), m_HashMove(hashMove), m_CounterMove(counterMove), m_Killers(killers)
+	MoveSelector<TYPE>::MoveSelector(const Position& position, SearchStack* stack, Move hashMove, Move counterMove, Move killers[2], SearchTables* tables)
+		: m_Stage(FIND_TT_MOVE), m_Position(position), m_HashMove(hashMove), m_CounterMove(counterMove), m_Killers(killers), m_Stack(stack), m_Tables(tables)
 	{
 		STORM_ASSERT(TYPE == ALL_MOVES, "Invalid Type");
 		if (m_HashMove == MOVE_NONE)
@@ -161,6 +162,12 @@ top:
 			}
 		}
 
+		int16_t* cmhPtr[MaxCmhPly];
+		if constexpr (TYPE == ALL_MOVES)
+		{
+			SetCounterMoveHistoryPointer(cmhPtr, m_Stack, &m_Tables->CounterMoveHistory, m_Stack->Ply);
+		}
+
 		ValueMove* it = m_Start;
 		while (it != m_End)
 		{
@@ -181,6 +188,7 @@ top:
 					it->Value += KillerMoveBonuses[0];
 				else if (*it == m_Killers[1])
 					it->Value += KillerMoveBonuses[1];
+				it->Value += GetHistoryScore(m_Stack, m_Position, cmhPtr, it->Move, m_Tables);
 			}
 			++it;
 		}

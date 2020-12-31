@@ -63,9 +63,9 @@ namespace Storm
 			return entry;
 		}
 
-	private:
 		inline size_t HashToIndex(uint64_t hash) const
 		{
+			STORM_ASSERT((hash & m_Mask) < m_EntryCount, "Invalid index");
 			return hash & m_Mask;
 		}
 

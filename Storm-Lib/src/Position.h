@@ -39,8 +39,8 @@ namespace Storm
 			BitBoard BlockersForKing[COLOR_MAX];
 			// Pieces that attack a piece that blocks the enemy king
 			BitBoard Pinners[COLOR_MAX];
-			// Piece type on squares - PIECE_NONE if no piece on square
-			Piece PieceOnSquare[SQUARE_MAX];
+			// Piece type on squares - COLOR_PIECE_NONE if no piece on square
+			ColorPiece PieceOnSquare[SQUARE_MAX];
 
 			// Midgame Non pawn material
 			ValueType NonPawnMaterial[COLOR_MAX];
@@ -75,10 +75,10 @@ namespace Storm
 		inline BitBoard GetPieces(Color color, Piece p0, Piece p1) const { return GetPieces(color, p0) | GetPieces(color, p1); }
 		inline BitBoard GetPieces(Color color, Piece p0, Piece p1, Piece p2) const { return GetPieces(color, p0, p1) | GetPieces(color, p2); }
 		inline SquareIndex GetKingSquare(Color color) const { return Cache.KingSquare[color]; }
-		inline Piece GetPieceOnSquare(SquareIndex square) const { return Cache.PieceOnSquare[square]; }
-		inline Color GetColorAt(SquareIndex square) const { return (GetPieces(COLOR_WHITE) & square) ? COLOR_WHITE : COLOR_BLACK; }
-		inline bool SquareOccupied(SquareIndex square) const { return GetPieceOnSquare(square) != PIECE_NONE; }
+		inline ColorPiece GetPieceOnSquare(SquareIndex square) const { return Cache.PieceOnSquare[square]; }
+		inline bool SquareOccupied(SquareIndex square) const { return GetPieceOnSquare(square) != COLOR_PIECE_NONE; }
 		inline BitBoard GetBlockersForKing(Color color) const { return Cache.BlockersForKing[color]; }
+		inline Color GetColorOnSquare(SquareIndex square) const { return (GetPieces(COLOR_WHITE) & square) ? COLOR_WHITE : COLOR_BLACK; }
 
 		inline bool InCheck() const { return Cache.CheckedBy != ZERO_BB; }
 		inline BitBoard GetCheckers() const { return Cache.CheckedBy; };
@@ -87,9 +87,9 @@ namespace Storm
 		inline ValueType GetNonPawnMaterial() const { return GetNonPawnMaterial(COLOR_WHITE) + GetNonPawnMaterial(COLOR_BLACK); }
 		inline int GetTotalHalfMoves() const { return 2 * TotalTurns + (ColorToMove == COLOR_BLACK); }
 
-		inline Piece GetMovingPiece(Move move) const { return GetPieceOnSquare(GetFromSquare(move)); }
-		inline Piece GetCapturedPiece(Move move) const { return GetPieceOnSquare(GetToSquare(move)); }
-		inline bool IsCapture(Move move) const { return GetCapturedPiece(move) != PIECE_NONE; }
+		inline Piece GetMovingPiece(Move move) const { return TypeOf(GetPieceOnSquare(GetFromSquare(move))); }
+		inline Piece GetCapturedPiece(Move move) const { return TypeOf(GetPieceOnSquare(GetToSquare(move))); }
+		inline bool IsCapture(Move move) const { return GetPieceOnSquare(GetToSquare(move)) != COLOR_PIECE_NONE; }
 
 		bool GivesCheck(Move move) const;
 		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);
