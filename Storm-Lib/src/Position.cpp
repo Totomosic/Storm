@@ -104,6 +104,7 @@ namespace Storm
 		const bool isEnpassant = movingPiece == PIECE_PAWN && toSquare == EnpassantSquare;
 		const Color otherColor = OtherColor(ColorToMove);
 		const Rank otherBackRank = otherColor == COLOR_WHITE ? RANK_1 : RANK_8;
+		const Rank castleRank = ColorToMove == COLOR_WHITE ? RANK_1 : RANK_8;
 
 		if (EnpassantSquare != SQUARE_INVALID)
 		{
@@ -199,7 +200,7 @@ namespace Storm
 				Colors[ColorToMove].CastleQueenSide = false;
 			}
 		}
-		else if (movingPiece == PIECE_ROOK)
+		else if (movingPiece == PIECE_ROOK && fromRank == castleRank)
 		{
 			if (Colors[ColorToMove].CastleKingSide && fromFile == FILE_H)
 			{

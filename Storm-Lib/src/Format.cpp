@@ -132,9 +132,6 @@ namespace Storm
     }
 
 
-
-
-
 	std::string PGN::FormatMove(Move move, const Position& position)
 	{
 		std::string moveString;

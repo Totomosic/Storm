@@ -156,4 +156,10 @@ namespace Storm
 
 	std::string FormatEvaluation(const EvaluationResult& result);
 
+	inline bool InsufficientMaterial(const Position& position)
+	{
+		BitBoard pieces = position.GetPieces();
+		return Popcount(pieces) <= 3 && (pieces & position.GetPieces(PIECE_KNIGHT, PIECE_BISHOP));
+	}
+
 }

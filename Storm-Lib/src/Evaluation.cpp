@@ -145,8 +145,8 @@ namespace Storm
 		while (threatenedPieces)
 		{
 			SquareIndex enemySquare = PopLeastSignificantBit(threatenedPieces);
-			mg += Threats[P - PIECE_START][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][MIDGAME];
-			eg += Threats[P - PIECE_START][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][ENDGAME];
+			mg += Threats[P - PIECE_KNIGHT][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][MIDGAME];
+			eg += Threats[P - PIECE_KNIGHT][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][ENDGAME];
 		}
 	}
 
