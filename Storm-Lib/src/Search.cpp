@@ -151,6 +151,7 @@ namespace Storm
         SearchStack* stackPtr = InitStack(stack, 4, position, pv, positionHistory);
 
         int multiPv = std::max(m_Settings.MultiPv, 1);
+        multiPv = std::min(multiPv, int(m_RootMoves.size()));
         
         ValueType alpha = -VALUE_MATE;
         ValueType beta = VALUE_MATE;
@@ -160,6 +161,10 @@ namespace Storm
         
         while (rootDepth <= depth)
         {
+
+            for (RootMove& mv : m_RootMoves)
+                mv.PreviousScore = mv.Score;
+
             for (int pvIndex = 0; pvIndex < multiPv; pvIndex++)
             {
                 m_StartSearchTime = std::chrono::high_resolution_clock::now();
@@ -171,8 +176,8 @@ namespace Storm
                 if (depth >= AspirationWindowDepth)
                 {
                     delta = 16;
-                    alpha = std::max(bestValue - delta, -VALUE_MATE);
-                    beta = std::min(bestValue + delta, VALUE_MATE);
+                    alpha = std::max(m_RootMoves[pvIndex].PreviousScore - delta, -VALUE_MATE);
+                    beta = std::min(m_RootMoves[pvIndex].PreviousScore + delta, VALUE_MATE);
                 }
 
                 int betaCutoffs = 0;
@@ -195,6 +200,7 @@ namespace Storm
                     {
                         beta = (alpha + beta) / 2;
                         alpha = std::max(value - delta, -VALUE_MATE);
+                        betaCutoffs = 0;
                     }
                     else if (value >= beta && value != VALUE_MATE)
                     {
@@ -307,11 +313,11 @@ namespace Storm
         if (depth <= 0)
             return QuiescenceSearch<NT>(position, stack, depth, alpha, beta, cutNode);
 
-        if (IsDraw(position, stack))
-            return VALUE_DRAW;
-
         if (stack->Ply >= selDepth)
             selDepth = stack->Ply + 1;
+
+        if (!IsRoot && IsDraw(position, stack))
+            return VALUE_DRAW;
 
         // Mate distance pruning
         if (!IsRoot)
@@ -573,12 +579,14 @@ namespace Storm
 
         if (bestValue == -VALUE_MATE)
         {
+            if (stack->SkipMove != MOVE_NONE)
+                return alpha;
             if (inCheck)
                 return MatedIn(stack->Ply);
             return VALUE_DRAW;
         }
 
-        if (stack->SkipMove == MOVE_NONE && m_PvIndex == 0)
+        if (stack->SkipMove == MOVE_NONE && !(IsRoot && m_PvIndex != 0))
             ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
 
         return bestValue;
@@ -696,8 +704,7 @@ namespace Storm
         if (inCheck && bestValue == -VALUE_MATE)
             return MatedIn(stack->Ply);
 
-        if (m_PvIndex == 0)
-            ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
+        ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
         return bestValue;
     }
 
@@ -714,7 +721,7 @@ namespace Storm
 
     bool Search::IsDraw(const Position& position, SearchStack* stack) const
     {
-        if (position.HalfTurnsSinceCaptureOrPush >= 100)
+        if (position.HalfTurnsSinceCaptureOrPush >= 100 || InsufficientMaterial(position))
             return true;
         if (stack && stack->Ply + m_PositionHistory.size() >= 8)
         {

@@ -33,10 +33,10 @@ namespace Storm
 	// =======================================================================================================================================================================================
 
 	constexpr int PawnStageWeight = 0;
-	constexpr int KnightStageWeight = 1;
-	constexpr int BishopStageWeight = 1;
-	constexpr int RookStageWeight = 3;
-	constexpr int QueenStageWeight = 6;
+	constexpr int KnightStageWeight = 6;
+	constexpr int BishopStageWeight = 6;
+	constexpr int RookStageWeight = 13;
+	constexpr int QueenStageWeight = 28;
 	constexpr int KingStageWeight = 0;
 
 	constexpr int GameStageWeights[PIECE_COUNT] = {
@@ -75,14 +75,14 @@ namespace Storm
 	constexpr ValueType KnightValueMg	= 310;
 	constexpr ValueType BishopValueMg	= 330;
 	constexpr ValueType RookValueMg		= 500;
-	constexpr ValueType QueenValueMg	= 950;
+	constexpr ValueType QueenValueMg	= 1000;
 	constexpr ValueType KingValueMg		= 20000;
 
 	constexpr ValueType PawnValueEg		= 140;
 	constexpr ValueType KnightValueEg	= 310;
 	constexpr ValueType BishopValueEg	= 330;
 	constexpr ValueType RookValueEg		= 500;
-	constexpr ValueType QueenValueEg	= 950;
+	constexpr ValueType QueenValueEg	= 1000;
 	constexpr ValueType KingValueEg		= 20000;
 
 	constexpr ValueType PIECE_VALUES_MG[PIECE_COUNT + 1] = {
@@ -133,9 +133,9 @@ namespace Storm
 		0,  0,  0,  0,  0,  0,  0,  0,
 	   50, 50, 50, 50, 50, 50, 50, 50,
 	   10, 10, 20, 20, 30, 20, 10, 10,
-		5,  5, 10,  5, 10, 10,  5,  5,
+		5,  5, 10,  5, 25, 10,  5,  5,
 		5,  0, 10, 15, 25,  0,  0,  5,
-		5,  5,  5,  7, 15, 11,  5,  5,
+		5,  5, 10,  7, 15, 11,  5,  5,
 		5, 10, 10,-10,-10, 10,  5,  5,
 		0,  0,  0,  0,  0,  0,  0,  0,
 	};

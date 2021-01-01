@@ -105,6 +105,7 @@ namespace Storm
 	public:
 		std::vector<Move> Pv;
 		ValueType Score;
+		ValueType PreviousScore;
 		int SelDepth;
 
 	public:

@@ -148,6 +148,9 @@ namespace Test
 
 		position = CreatePositionFromFEN("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10");
 		REQUIRE(search.Perft(position, 5) == 164075551);
+
+		position = CreatePositionFromFEN("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ -");
+		REQUIRE(search.Perft(position, 6) == 706045033);
 	}
 
 	TEST_CASE("Transposition", "[Transposition]")
