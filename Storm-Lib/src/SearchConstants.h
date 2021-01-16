@@ -55,4 +55,11 @@ namespace Storm
 
 	constexpr int CmhPruneDepth = 3;
 
+	// Skill
+
+	constexpr int GetMultiPv(int skillLevel)
+	{
+		return skillLevel >= 20 ? 1 : ((20 - skillLevel) / 4 + 2);
+	}
+
 }

@@ -94,6 +94,11 @@ namespace Storm
 		return Rank(~uint8_t(rank) & 0x7);
 	}
 
+	constexpr SquareIndex OppositeSquare(SquareIndex square)
+	{
+		return SquareIndex(square ^ 56);
+	}
+
 	constexpr SquareIndex CreateSquare(File file, Rank rank)
 	{
 		return SquareIndex(file + FILE_MAX * rank);

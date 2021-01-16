@@ -4,41 +4,9 @@
 namespace Storm
 {
 
-	ValueType PieceSquareTables[COLOR_MAX][PIECE_COUNT][GAME_STAGE_MAX][SQUARE_MAX];
+	// ValueType PieceSquareTables[COLOR_MAX][PIECE_COUNT][GAME_STAGE_MAX][SQUARE_MAX];
 	BitBoard PassedPawnMasks[COLOR_MAX][SQUARE_MAX];
 	BitBoard SupportedPawnMasks[COLOR_MAX][SQUARE_MAX];
-
-	void MirrorTable(ValueType* dest, const ValueType* src)
-	{
-		for (File file = FILE_A; file < FILE_MAX; file++)
-		{
-			for (Rank rank = RANK_1; rank < RANK_MAX; rank++)
-			{
-				SquareIndex srcIndex = CreateSquare(file, rank);
-				SquareIndex dstIndex = CreateSquare(file, Rank(RANK_MAX - rank - 1));
-				dest[dstIndex] = src[srcIndex];
-			}
-		}
-	}
-
-	template<Piece P>
-	void InitPieceSquareTable(const ValueType* mgTable, const ValueType* egTable)
-	{
-		MirrorTable(PieceSquareTables[COLOR_WHITE][P - PIECE_START][MIDGAME], mgTable);
-		MirrorTable(PieceSquareTables[COLOR_BLACK][P - PIECE_START][MIDGAME], PieceSquareTables[COLOR_WHITE][P - PIECE_START][MIDGAME]);
-		MirrorTable(PieceSquareTables[COLOR_WHITE][P - PIECE_START][ENDGAME], egTable);
-		MirrorTable(PieceSquareTables[COLOR_BLACK][P - PIECE_START][ENDGAME], PieceSquareTables[COLOR_WHITE][P - PIECE_START][ENDGAME]);
-	}
-
-	void InitPieceSquareTables()
-	{
-		InitPieceSquareTable<PIECE_PAWN>(WhitePawnsTableReversed, WhitePawnsTableReversed);
-		InitPieceSquareTable<PIECE_KNIGHT>(WhiteKnightsTableReversed, WhiteKnightsTableReversed);
-		InitPieceSquareTable<PIECE_BISHOP>(WhiteBishopsTableReversed, WhiteBishopsTableReversed);
-		InitPieceSquareTable<PIECE_ROOK>(WhiteRooksTableReversed, WhiteRooksTableReversed);
-		InitPieceSquareTable<PIECE_QUEEN>(WhiteQueensTableReversed, WhiteQueensTableReversed);
-		InitPieceSquareTable<PIECE_KING>(WhiteKingsTableMidgameReversed, WhiteKingsTableEndgameReversed);
-	}
 
 	void InitPassedPawnMasks()
 	{
@@ -58,7 +26,6 @@ namespace Storm
 
 	void InitEvaluation()
 	{
-		InitPieceSquareTables();
 		InitPassedPawnMasks();
 	}
 
@@ -95,8 +62,8 @@ namespace Storm
 		while (pawns)
 		{
 			SquareIndex square = PopLeastSignificantBit(pawns);
-			mg += PieceSquareTables[C][PIECE_PAWN - PIECE_START][MIDGAME][square];
-			eg += PieceSquareTables[C][PIECE_PAWN - PIECE_START][ENDGAME][square];
+			mg += GetPieceSquareValue<C, PIECE_PAWN, MIDGAME>(square);
+			eg += GetPieceSquareValue<C, PIECE_PAWN, ENDGAME>(square);
 
 			if (IsPassedPawn<C>(square, enemyPawns))
 			{
@@ -197,8 +164,8 @@ namespace Storm
 		{
 			result.Stage -= GameStageWeights[P - PIECE_START];
 			SquareIndex square = PopLeastSignificantBit(pieces);
-			mg += PieceSquareTables[C][P - PIECE_START][MIDGAME][square];
-			eg += PieceSquareTables[C][P - PIECE_START][ENDGAME][square];
+			mg += GetPieceSquareValue<C, P, MIDGAME>(square);
+			eg += GetPieceSquareValue<C, P, ENDGAME>(square);
 
 			BitBoard attacks =
 				P == PIECE_KNIGHT ? GetAttacks<PIECE_KNIGHT>(square) :
@@ -301,7 +268,7 @@ namespace Storm
 			ValueType danger = data.AttackUnits[OtherColor(C)] * data.AttackUnits[OtherColor(C)] * AttackerCountScaling[std::min(data.AttackerCount[OtherColor(C)], MaxAttackerCount - 1)] / MaxAttackerCount;
 			// KingSafetyTable[std::min(data.AttackUnits[OtherColor(C)], MAX_ATTACK_UNITS - 1)];
 			if (!position.GetPieces(OtherColor(C), PIECE_QUEEN))
-				danger = std::max(danger - 200, 0);
+				danger = std::max(danger - 100, 0);
 			mg -= danger;
 			eg -= danger / 4;
 		}
@@ -320,7 +287,6 @@ namespace Storm
 				// PawnShield indexed relative to black
 				SquareIndex index = CreateSquare(file, RelativeRank<C>(RankOf(advancedPawn)));
 				mg += PawnShield[index];
-				eg += PawnShield[index];
 			}
 
 			BitBoard enemyPawns = position.GetPieces(OtherColor(C), PIECE_PAWN) & FILE_MASKS[file] & pawnMask;
@@ -333,8 +299,8 @@ namespace Storm
 			}
 		}
 
-		mg += PieceSquareTables[C][PIECE_KING - PIECE_START][MIDGAME][kingSquare];
-		eg += PieceSquareTables[C][PIECE_KING - PIECE_START][ENDGAME][kingSquare];
+		mg += GetPieceSquareValue<C, PIECE_KING, MIDGAME>(kingSquare);
+		eg += GetPieceSquareValue<C, PIECE_KING, ENDGAME>(kingSquare);
 
 		result.KingSafety[C][MIDGAME] = mg;
 		result.KingSafety[C][ENDGAME] = eg;

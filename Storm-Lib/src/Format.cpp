@@ -137,7 +137,10 @@ namespace Storm
 		std::string moveString;
 		if (GetMoveType(move) == CASTLE)
 		{
-			moveString = "O-O";
+			if (FileOf(GetToSquare(move)) == FILE_G)
+				moveString = "O-O";
+			else
+				moveString = "O-O-O";
 		}
 		else
 		{

@@ -103,6 +103,7 @@ namespace Storm
 		constexpr bool IsMateScore(ValueType score) const { return score >= MateIn(MAX_PLY) || score <= MatedIn(MAX_PLY); }
 		bool CheckLimits() const;
 		std::vector<RootMove> GenerateRootMoves(const Position& position) const;
+		int SelectBestMoveIndex(int multipv, int skillLevel) const;
 
 		SearchStack* InitStack(SearchStack* stack, int count, const Position& position, Move* pv, ZobristHash* history) const;
 

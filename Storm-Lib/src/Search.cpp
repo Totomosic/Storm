@@ -1,5 +1,6 @@
 #include "Search.h"
 #include <chrono>
+#include <random>
 
 namespace Storm
 {
@@ -150,14 +151,13 @@ namespace Storm
         SearchStack stack[MAX_PLY + 10];
         SearchStack* stackPtr = InitStack(stack, 4, position, pv, positionHistory);
 
-        int multiPv = std::max(m_Settings.MultiPv, 1);
+        int skillLevelMultiPv = GetMultiPv(m_Settings.SkillLevel);
+        int multiPv = std::max({ m_Settings.MultiPv, skillLevelMultiPv, 1 });
         multiPv = std::min(multiPv, int(m_RootMoves.size()));
         
         ValueType alpha = -VALUE_MATE;
         ValueType beta = VALUE_MATE;
         ValueType bestValue = -VALUE_MATE;
-
-        RootMove bestMove;
         
         while (rootDepth <= depth)
         {
@@ -220,47 +220,49 @@ namespace Storm
                 }
 
                 RootMove& rootMove = m_RootMoves[m_PvIndex];
-                if (m_PvIndex == 0)
-                    bestMove = rootMove;
 
-                if (m_Log)
+                // Don't report lines that are generated due to SkillLevel
+                if (m_PvIndex < m_Settings.MultiPv)
                 {
-                    auto elapsed = std::chrono::high_resolution_clock::now() - m_StartSearchTime;
-                    std::cout << "info depth " << rootDepth << " seldepth " << rootMove.SelDepth << " score ";
-                    if (!IsMateScore(rootMove.Score))
+                    if (m_Log)
                     {
-                        std::cout << "cp " << rootMove.Score;
-                    }
-                    else
-                    {
-                        if (rootMove.Score > 0)
-                            std::cout << "mate " << (GetPliesFromMateScore(rootMove.Score) / 2 + 1);
+                        auto elapsed = std::chrono::high_resolution_clock::now() - m_StartSearchTime;
+                        std::cout << "info depth " << rootDepth << " seldepth " << rootMove.SelDepth << " score ";
+                        if (!IsMateScore(rootMove.Score))
+                        {
+                            std::cout << "cp " << rootMove.Score;
+                        }
                         else
-                            std::cout << "mate " << -(GetPliesFromMateScore(rootMove.Score) / 2);
+                        {
+                            if (rootMove.Score > 0)
+                                std::cout << "mate " << (GetPliesFromMateScore(rootMove.Score) / 2 + 1);
+                            else
+                                std::cout << "mate " << -(GetPliesFromMateScore(rootMove.Score) / 2);
+                        }
+                        std::cout << " nodes " << m_Nodes;
+                        std::cout << " nps " << (size_t)(m_Nodes / (elapsed.count() / 1e9f));
+                        std::cout << " time " << (size_t)(elapsed.count() / 1e6f);
+                        std::cout << " multipv " << (pvIndex + 1);
+                        //if (hashFull >= 500)
+                        //    std::cout << " hashfull " << hashFull;
+                        std::cout << " pv";
+                        for (Move move : rootMove.Pv)
+                        {
+                            std::cout << " " << UCI::FormatMove(move);
+                        }
+                        std::cout << std::endl;
                     }
-                    std::cout << " nodes " << m_Nodes;
-                    std::cout << " nps " << (size_t)(m_Nodes / (elapsed.count() / 1e9f));
-                    std::cout << " time " << (size_t)(elapsed.count() / 1e6f);
-                    std::cout << " multipv " << (pvIndex + 1);
-                    //if (hashFull >= 500)
-                    //    std::cout << " hashfull " << hashFull;
-                    std::cout << " pv";
-                    for (Move move : rootMove.Pv)
+                    if (callback)
                     {
-                        std::cout << " " << UCI::FormatMove(move);
+                        SearchResult result;
+                        result.BestMove = rootMove.Pv.size() > 0 ? rootMove.Pv[0] : MOVE_NONE;
+                        result.PV = rootMove.Pv;
+                        result.Score = rootMove.Score;
+                        result.PVIndex = pvIndex;
+                        result.Depth = rootDepth;
+                        result.SelDepth = selDepth;
+                        callback(result);
                     }
-                    std::cout << std::endl;
-                }
-                if (callback)
-                {
-                    SearchResult result;
-                    result.BestMove = rootMove.Pv.size() > 0 ? rootMove.Pv[0] : MOVE_NONE;
-                    result.PV = rootMove.Pv;
-                    result.Score = rootMove.Score;
-                    result.PVIndex = pvIndex;
-                    result.Depth = rootDepth;
-                    result.SelDepth = selDepth;
-                    callback(result);
                 }
             }
 
@@ -274,7 +276,9 @@ namespace Storm
         }
 
         delete[] positionHistory;
-        return bestMove;
+        if (m_RootMoves.empty())
+            return {};
+        return m_RootMoves[SelectBestMoveIndex(std::min(multiPv, skillLevelMultiPv), m_Settings.SkillLevel)];
     }
 
     template<Search::NodeType NT>
@@ -770,9 +774,40 @@ namespace Storm
         std::vector<RootMove> result;
         for (Move move : list)
         {
-            result.push_back({ std::vector<Move>{ move }, VALUE_DRAW, 0 });
+            RootMove mv;
+            mv.Pv = { move };
+            mv.Score = VALUE_DRAW;
+            mv.PreviousScore = VALUE_DRAW;
+            mv.SelDepth = 0;
+            result.push_back(mv);
         }
         return result;
+    }
+
+    int Search::SelectBestMoveIndex(int multipv, int skillLevel) const
+    {
+        if (skillLevel == 20 || multipv <= 1)
+            return 0;
+        std::mt19937 engine;
+        engine.seed(time(nullptr));
+
+        ValueType bestScore = m_RootMoves[0].Score;
+        ValueType delta = std::min(bestScore - m_RootMoves[size_t(multipv) - 1].Score, PawnValueEg);
+        ValueType weakness = 120 - 2 * skillLevel;
+        ValueType maxScore = -VALUE_MATE;
+
+        int bestIndex = 0;
+        for (int i = 0; i < multipv; i++)
+        {
+            std::uniform_int_distribution<ValueType> dist(0, weakness);
+            int push = (weakness * int(bestScore - m_RootMoves[i].Score) + delta * dist(engine)) / 120;
+            if (m_RootMoves[i].Score + push >= maxScore)
+            {
+                maxScore = m_RootMoves[i].Score + push;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
     }
 
     SearchStack* Search::InitStack(SearchStack* stack, int count, const Position& position, Move* pv, ZobristHash* history) const
