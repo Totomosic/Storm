@@ -37,10 +37,3 @@ Example of the engine running [here](https://totomosic.github.io). (built to Web
 1. Run `Scripts/Linux-GenProjects.sh` to generate the Makefiles.
 2. Run `make -j<number_of_cores> Storm-Cli` to build Storm.
 3. Build outputs are located in the `bin` directory.
-
-## Building Python SWIG Bindings:
-1. Copy `SwigConfig.lua.example` to `SwigConfigWindows.lua` or `SwigConfigLinux.lua` depending on operating system
-2. Update the relevant information in the config file
-3. Run the relevant `{os}-GenProjects` script
-4. Build the `Storm-Swig` project as you normally would on your operating system (on linux you must use `config=distshared` or `config=releaseshared`)
-5. This will generate a `.py` and a shared object file in the `bin` directory
