@@ -1,6 +1,7 @@
 # Storm
 C++ UCI Chess engine inspired by [Stockfish](https://stockfishchess.org/).
-Created using ideas learned during the developlemnt of [Boxfish](https://github.com/Totomosic/Boxfish).
+Created using ideas learned during the development of [Boxfish](https://github.com/Totomosic/Boxfish).
+
 Example of the engine running [here](https://totomosic.github.io). (built to WebAssembly with Emscripten)
 
 ## Features
