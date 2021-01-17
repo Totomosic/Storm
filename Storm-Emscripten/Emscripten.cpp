@@ -112,6 +112,7 @@ Move CreateMoveHelper(const Position& position, SquareIndex from, SquareIndex to
 
 EMSCRIPTEN_BINDINGS(Storm) {
 	register_vector<Move>("MoveList");
+	register_vector<PGNMatch>("MatchList");
 
 	constant("SQUARE_MAX", (int)SQUARE_MAX);
 	constant("VALUE_MATE", VALUE_MATE);
@@ -273,7 +274,8 @@ EMSCRIPTEN_BINDINGS(Storm) {
 		.class_function("CreateMoveFromString", &UCI::CreateMoveFromString);
 	class_<PGN>("PGN")
 		.class_function("FormatMove", &PGN::FormatMove)
-		.class_function("CreateMoveFromString", &PGN::CreateMoveFromString);
+		.class_function("CreateMoveFromString", &PGN::CreateMoveFromString)
+		.class_function("ReadFromString", &PGN::ReadFromString);
 	class_<Position>("Position")
 		.property("ColorToMove", &PositionGetColorToMove, &PositionSetColorToMove)
 		.property("EnpassantSquare", &PositionGetEnpassant, &PositionSetEnpassant)
@@ -306,4 +308,7 @@ EMSCRIPTEN_BINDINGS(Storm) {
 		.function("SearchMoveTime", &SearchBestMoveTime)
 		.function("SearchDepth", &SearchBestMoveDepth)
 		.function("Ponder", &SearchPonder);
+	value_object<PGNMatch>("PGNMatch")
+		.field("InitialPosition", &PGNMatch::InitialPosition)
+		.field("Moves", &PGNMatch::Moves);
 }

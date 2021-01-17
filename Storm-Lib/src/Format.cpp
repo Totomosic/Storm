@@ -424,13 +424,20 @@ namespace Storm
 								break;
 							else
 							{
-								if (str.find('.') == std::string::npos)
+								bool hasPeriod = str.find('.') != std::string::npos;
+								bool valid = !hasPeriod;
+								if (hasPeriod && str.find('.') != str.size() - 1)
+								{
+									valid = true;
+									str = str.substr(str.find('.') + 1);
+								}
+								if (valid)
 								{
 									Move buffer[MAX_MOVES];
 									MoveList legalMoves(buffer);
 									legalMoves.FillLegal<ALL>(currentPosition);
 									Move move = CreateMoveFromString(currentPosition, str);
-									if (move != MOVE_NONE && std::find(legalMoves.begin(), legalMoves.end(), move) == legalMoves.end())
+									if (move != MOVE_NONE && std::find(legalMoves.begin(), legalMoves.end(), move) != legalMoves.end())
 									{
 										STORM_ASSERT(FormatMove(move, currentPosition) == str, "Invalid move");
 										currentMatch.Moves.push_back(move);

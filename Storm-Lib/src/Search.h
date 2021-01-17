@@ -6,6 +6,7 @@
 #include "TranspositionTable.h"
 #include "SearchConstants.h"
 #include "SearchData.h"
+#include "TimeManager.h"
 
 #include <atomic>
 #include <chrono>
@@ -46,6 +47,7 @@ namespace Storm
 		TranspositionTable m_TranspositionTable;
 		std::vector<ZobristHash> m_PositionHistory;
 		SearchSettings m_Settings;
+		TimeManager m_TimeManager;
 
 		bool m_Log;
 		SearchLimits m_Limits;
@@ -53,7 +55,6 @@ namespace Storm
 		size_t m_Nodes;
 		int m_PvIndex;
 
-		std::chrono::time_point<std::chrono::high_resolution_clock> m_StartRootTime;
 		std::chrono::time_point<std::chrono::high_resolution_clock> m_StartSearchTime;
 		bool m_Stopped;
 		std::atomic<bool> m_ShouldStop;
