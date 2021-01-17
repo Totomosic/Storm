@@ -26,7 +26,7 @@ namespace Storm
     }
 
     Search::Search(size_t ttSize, bool log)
-        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Settings(), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_PvIndex(0), m_StartRootTime(), m_StartSearchTime(),
+        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Settings(), m_TimeManager(), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_PvIndex(0), m_StartSearchTime(),
         m_Stopped(false), m_ShouldStop(false), m_SearchTables(std::make_unique<SearchTables>())
     {
         ClearTable<Move, SQUARE_MAX, SQUARE_MAX>(m_SearchTables->CounterMoves, MOVE_NONE);
@@ -78,7 +78,7 @@ namespace Storm
 
     void Search::Ponder(const Position& position, const std::function<void(const SearchResult&)>& callback)
     {
-        SearchBestMove(position, SearchLimits{}, callback);
+        Ponder(position, SearchLimits{}, callback);
     }
 
     void Search::Ponder(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
@@ -142,7 +142,11 @@ namespace Storm
 
         m_Stopped = false;
         m_ShouldStop = false;
-        m_StartRootTime = std::chrono::high_resolution_clock::now();
+        if (m_Limits.Milliseconds > 0 && !m_Limits.Infinite)
+            m_TimeManager.SetMillisecondsToMove(m_Limits.Milliseconds);
+        else
+            m_TimeManager.Disable();
+        m_TimeManager.StartSearch();
         int rootDepth = 1;
 
         Move pv[MAX_PLY];
@@ -752,12 +756,8 @@ namespace Storm
             return m_ShouldStop || m_Stopped;
         if (m_Nodes & 2048)
         {
-            if (m_Limits.Milliseconds > 0)
-            {
-                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - m_StartRootTime);
-                if (elapsed.count() >= m_Limits.Milliseconds)
-                    return true;
-            }
+            if (m_TimeManager.IsSearchComplete())
+                return true;
             if (m_Limits.Nodes > 0)
             {
                 return m_Nodes >= m_Limits.Nodes;
