@@ -112,8 +112,8 @@ namespace Storm
 		while (threatenedPieces)
 		{
 			SquareIndex enemySquare = PopLeastSignificantBit(threatenedPieces);
-			mg += Threats[P - PIECE_KNIGHT][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][MIDGAME];
-			eg += Threats[P - PIECE_KNIGHT][TypeOf(position.GetPieceOnSquare(enemySquare)) - PIECE_START][ENDGAME];
+			mg += GetThreatBonus<P, MIDGAME>(TypeOf(position.GetPieceOnSquare(enemySquare)));
+			eg += GetThreatBonus<P, ENDGAME>(TypeOf(position.GetPieceOnSquare(enemySquare)));
 		}
 	}
 
@@ -139,7 +139,10 @@ namespace Storm
 				File file = FileOf(square);
 				Rank rank = RankOf(square);
 				if (data.AttackedBy[OtherColor(C)][PIECE_PAWN] & (FILE_MASKS[file] & InFrontOrEqual<C>(rank)))
+				{
 					outpostSquares &= ~FILE_MASKS[file];
+					b &= ~FILE_MASKS[file];
+				}
 			}
 		}
 
@@ -183,8 +186,8 @@ namespace Storm
 			attacks &= data.MobilityArea[C];
 
 			int reachableSquares = Popcount(attacks);
-			mg += MobilityWeights[P - PIECE_START][MIDGAME] * (reachableSquares - MobilityOffsets[P - PIECE_START]);
-			eg += MobilityWeights[P - PIECE_START][ENDGAME] * (reachableSquares - MobilityOffsets[P - PIECE_START]);
+			mg += GetMobilityBonus<P, MIDGAME>(reachableSquares);
+			eg += GetMobilityBonus<P, ENDGAME>(reachableSquares);
 
 			if constexpr (P != PIECE_QUEEN)
 			{
@@ -195,11 +198,13 @@ namespace Storm
 			{
 				if (outpostSquares & square)
 				{
+					// Knight/Bishop on outpost square
 					mg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1];
 					eg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1];
 				}
 				else if (outpostSquares & attacks)
 				{
+					// Knight/Bishop threatening to go to outpost square
 					mg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1] / 2;
 					eg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1] / 2;
 				}
@@ -210,14 +215,17 @@ namespace Storm
 				if constexpr (P == PIECE_BISHOP)
 				{
 					if (MoreThanOne(GetAttacks<PIECE_BISHOP>(square, position.GetPieces(PIECE_PAWN)) & Center))
-						mg += BishopTargettingCenterBonus;
+						mg += BishopTargetingCenterBonus;
 				}
 			}
 			if constexpr (P == PIECE_ROOK)
 			{
 				int pawnCountOnFile = Popcount(FILE_MASKS[FileOf(square)] & position.GetPieces(PIECE_PAWN));
-				mg += RookOnOpenFileBonus[pawnCountOnFile == 0 ? 0 : 1][MIDGAME];
-				eg += RookOnOpenFileBonus[pawnCountOnFile == 0 ? 0 : 1][ENDGAME];
+				if (pawnCountOnFile < 2)
+				{
+					mg += RookOnOpenFileBonus[pawnCountOnFile == 0 ? 0 : 1][MIDGAME];
+					eg += RookOnOpenFileBonus[pawnCountOnFile == 0 ? 0 : 1][ENDGAME];
+				}
 			}
 			if constexpr (P == PIECE_QUEEN)
 			{
@@ -263,15 +271,11 @@ namespace Storm
 			data.AttackUnits[OtherColor(C)] += Popcount(safeChecks) * SafeCheckWeight;
 		}
 
-		if (data.AttackerCount[OtherColor(C)] >= 2)
-		{
-			ValueType danger = data.AttackUnits[OtherColor(C)] * data.AttackUnits[OtherColor(C)] * AttackerCountScaling[std::min(data.AttackerCount[OtherColor(C)], MaxAttackerCount - 1)] / MaxAttackerCount;
-			// KingSafetyTable[std::min(data.AttackUnits[OtherColor(C)], MAX_ATTACK_UNITS - 1)];
-			if (!position.GetPieces(OtherColor(C), PIECE_QUEEN))
-				danger = std::max(danger - 100, 0);
-			mg -= danger;
-			eg -= danger / 4;
-		}
+		ValueType danger = data.AttackUnits[OtherColor(C)] * data.AttackUnits[OtherColor(C)] * AttackerCountScaling[std::min(data.AttackerCount[OtherColor(C)], MaxAttackerCount - 1)] / MaxAttackerCount;
+		if (!position.GetPieces(OtherColor(C), PIECE_QUEEN))
+			danger = std::max(danger - 100, 0);
+		mg -= danger;
+		eg -= danger / 4;
 
 		const BitBoard pawnMask = InFrontOrEqual<C>(kingRank);
 
@@ -351,7 +355,6 @@ namespace Storm
 	template<Color C>
 	void PostInitEvaluationData(const Position& position, EvaluationData& data)
 	{
-		data.AttackerCount[C] += data.AttackedBy[C][PIECE_PAWN] & data.KingAttackZone[OtherColor(C)];
 		data.MobilityArea[C] = ~(position.GetPieces(C, PIECE_PAWN) | data.AttackedBy[OtherColor(C)][PIECE_PAWN] | position.GetKingSquare(C));
 	}
 
