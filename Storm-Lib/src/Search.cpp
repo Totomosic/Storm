@@ -165,10 +165,6 @@ namespace Storm
         
         while (rootDepth <= depth)
         {
-
-            for (RootMove& mv : m_RootMoves)
-                mv.PreviousScore = mv.Score;
-
             for (int pvIndex = 0; pvIndex < multiPv; pvIndex++)
             {
                 m_StartSearchTime = std::chrono::high_resolution_clock::now();
@@ -222,6 +218,10 @@ namespace Storm
                     m_Stopped = true;
                     break;
                 }
+
+                // Search completed - update previous score
+                for (RootMove& mv : m_RootMoves)
+                    mv.PreviousScore = mv.Score;
 
                 RootMove& rootMove = m_RootMoves[m_PvIndex];
 
@@ -278,6 +278,11 @@ namespace Storm
 
             rootDepth++;
         }
+
+        // The previous score is guaranteed to be from a completed search
+        for (RootMove& mv : m_RootMoves)
+            mv.Score = mv.PreviousScore;
+        std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
 
         delete[] positionHistory;
         if (m_RootMoves.empty())
