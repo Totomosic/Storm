@@ -161,10 +161,11 @@ namespace Storm
         
         ValueType alpha = -VALUE_MATE;
         ValueType beta = VALUE_MATE;
-        ValueType bestValue = -VALUE_MATE;
         
         while (rootDepth <= depth)
         {
+            for (RootMove& mv : m_RootMoves)
+                mv.PreviousScore = mv.Score;
             for (int pvIndex = 0; pvIndex < multiPv; pvIndex++)
             {
                 m_StartSearchTime = std::chrono::high_resolution_clock::now();
@@ -186,7 +187,6 @@ namespace Storm
                 {
                     int adjustedDepth = std::max(1, rootDepth - betaCutoffs);
                     ValueType value = SearchPosition<PV>(position, stackPtr, adjustedDepth, alpha, beta, selDepth, false);
-                    bestValue = value;
 
                     if (CheckLimits())
                     {
@@ -219,14 +219,12 @@ namespace Storm
                     break;
                 }
 
-                // Search completed - update previous score
-                for (RootMove& mv : m_RootMoves)
-                    mv.PreviousScore = mv.Score;
+                std::stable_sort(m_RootMoves.begin(), m_RootMoves.begin() + pvIndex + 1);
 
-                RootMove& rootMove = m_RootMoves[m_PvIndex];
+                RootMove& rootMove = m_RootMoves[pvIndex];
 
                 // Don't report lines that are generated due to SkillLevel
-                if (m_PvIndex < m_Settings.MultiPv)
+                if (pvIndex < m_Settings.MultiPv)
                 {
                     if (m_Log)
                     {
@@ -356,8 +354,8 @@ namespace Storm
         }
         ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
 
-        ValueType ttValue = IsRoot ? m_RootMoves[0].Score : ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
-        Move ttMove = IsRoot ? m_RootMoves[0].Pv[0] : ttHit ? ttEntry->GetMove() : MOVE_NONE;
+        ValueType ttValue = IsRoot ? m_RootMoves[m_PvIndex].Score : ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
+        Move ttMove = IsRoot ? m_RootMoves[m_PvIndex].Pv[0] : ttHit ? ttEntry->GetMove() : MOVE_NONE;
 
         if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
         {
