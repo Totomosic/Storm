@@ -322,7 +322,7 @@ namespace Storm
 	constexpr ValueType GetMobilityBonus(int reachableSquares)
 	{
 		static_assert(P != PIECE_PAWN && P != PIECE_KING);
-		return MobilityBonus[S][P - PIECE_KNIGHT][reachableSquares];
+		return MobilityBonus[S][P - PIECE_KNIGHT][reachableSquares] / 2;
 		// return MobilityWeights[P - PIECE_START][S] * (reachableSquares - MobilityOffsets[P - PIECE_START]);
 	}
 
