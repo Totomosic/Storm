@@ -301,29 +301,11 @@ namespace Storm
 		0,  // PIECE_KING
 	};
 
-	constexpr ValueType MobilityBonus[GAME_STAGE_MAX][PIECE_COUNT - 2][32] = {
-		{
-			{ -2, 19, 31, 40, 49, 55, 61, 66, 71 },							// PIECE_KNIGHT
-			{  1, 14, 28, 31, 40, 46, 48, 47, 47, 48, 56, 65, 71, 100 },	// PIECE_BISHOP
-			{ -68, 5, 19, 22, 26, 25, 28, 32, 34, 36, 34, 37, 38, 46, 43 },	// PIECE_ROOK
-			{ -169, 11, 9, 12, 13, 12, 16, 16, 21, 21, 22, 21, 23, 21,		// PIECE_QUEEN
-				19, 20, 20, 12, 11, 15, 13, 18, 37, -7, 27, 22, -1, 13 },
-		},
-		{
-			{ -67, -15, 7, 15, 20, 27, 24, 20, 6 },							// PIECE_KNIGHT
-			{ -37, -10, -3, 9, 16, 23, 26, 27, 30, 26, 26, 16, 23, 6 },		// PIECE_BISHOP
-			{ -26, 6, 36, 43, 48, 55, 58, 59, 61, 66, 67, 68, 69, 67, 64 },	// PIECE_ROOK
-			{ -13, -24, -31, 15, 16, 41, 50, 65, 59, 76, 87, 95, 95, 103,	// PIECE_QUEEN
-			  111, 110, 104, 111, 105, 96, 86, 74, 54, 62, 59, 58, 68, 74 },
-		}
-	};
-
 	template<Piece P, GameStage S>
 	constexpr ValueType GetMobilityBonus(int reachableSquares)
 	{
 		static_assert(P != PIECE_PAWN && P != PIECE_KING);
-		return MobilityBonus[S][P - PIECE_KNIGHT][reachableSquares] / 2;
-		// return MobilityWeights[P - PIECE_START][S] * (reachableSquares - MobilityOffsets[P - PIECE_START]);
+		return MobilityWeights[P - PIECE_START][S] * (reachableSquares - MobilityOffsets[P - PIECE_START]);
 	}
 
 	constexpr ValueType OutpostBonus[2] = {

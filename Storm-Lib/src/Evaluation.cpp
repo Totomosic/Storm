@@ -209,7 +209,7 @@ namespace Storm
 					eg += OutpostBonus[P == PIECE_KNIGHT ? 0 : 1] / 2;
 				}
 
-				if (Shift<Down>(position.GetPieces(C, PIECE_PAWN)) & square)
+				if (Shift<Down>(position.GetPieces(C, PIECE_PAWN)) & square & InFrontOrEqual<C>(RelativeRank<C>(RANK_3)))
 					mg += MinorBehindPawnBonus;
 
 				if constexpr (P == PIECE_BISHOP)
