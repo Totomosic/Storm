@@ -63,6 +63,21 @@ SquareIndex PositionEnpassantCaptureSquare(const Position& position)
 	return GetEnpassantSquare(position.EnpassantSquare, position.ColorToMove);
 }
 
+std::string PositionHash(const Position& position)
+{
+	return std::to_string(position.Hash.Hash);
+}
+
+int PositionHalfTurnsSinceCaptureOrPush(const Position& position)
+{
+	return position.HalfTurnsSinceCaptureOrPush;
+}
+
+int PositionTotalTurns(const Position& position)
+{
+	return position.TotalTurns;
+}
+
 void PositionApplyMove(Position& position, Move move, UndoInfo& undo)
 {
 	position.ApplyMove(move, &undo);
@@ -279,6 +294,9 @@ EMSCRIPTEN_BINDINGS(Storm) {
 	class_<Position>("Position")
 		.property("ColorToMove", &PositionGetColorToMove, &PositionSetColorToMove)
 		.property("EnpassantSquare", &PositionGetEnpassant, &PositionSetEnpassant)
+		.property("HalfTurnsSinceCaptureOrPush", &PositionHalfTurnsSinceCaptureOrPush)
+		.property("TotalTurns", &PositionTotalTurns)
+		.property("Hash", &PositionHash)
 		.function("GetPieceOnSquare", &Position::GetPieceOnSquare)
 		.function("GetKingSquare", &Position::GetKingSquare)
 		.function("GetEnpassantCaptureSquare", &PositionEnpassantCaptureSquare)

@@ -176,7 +176,7 @@ namespace Storm
                 ValueType delta = 0;
                 if (depth >= AspirationWindowDepth)
                 {
-                    delta = 16;
+                    delta = InitialAspirationWindow;
                     alpha = std::max(m_RootMoves[pvIndex].PreviousScore - delta, -VALUE_MATE);
                     beta = std::min(m_RootMoves[pvIndex].PreviousScore + delta, VALUE_MATE);
                 }
@@ -196,6 +196,8 @@ namespace Storm
 
                     std::stable_sort(m_RootMoves.begin() + pvIndex, m_RootMoves.end());
 
+                    delta += delta / 2 + 2;
+
                     if (value <= alpha && value != -VALUE_MATE)
                     {
                         beta = (alpha + beta) / 2;
@@ -209,8 +211,6 @@ namespace Storm
                     }
                     else
                         break;
-
-                    delta += delta / 4 + 5;
                 }
 
                 if (CheckLimits())
@@ -402,13 +402,13 @@ namespace Storm
             }
 
             // Futility Pruning
-            if (position.GetNonPawnMaterial() > 0 && depth <= FutilityDepth && stack->StaticEvaluation - GetFutilityMargin(depth) >= beta && !IsMateScore(stack->StaticEvaluation))
+            if (position.GetNonPawnMaterial() > 0 && depth <= FutilityDepth && stack->StaticEvaluation - GetFutilityMargin(depth) >= beta)
             {
                 return stack->StaticEvaluation;
             }
 
             // Null move pruning
-            if (depth >= NullMoveDepth && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 3 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
+            if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
             {
                 Position movedPosition = position;
                 movedPosition.ApplyNullMove();
