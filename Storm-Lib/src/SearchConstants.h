@@ -33,7 +33,7 @@ namespace Storm
 	template<bool IsPvNode>
 	inline int GetLmrReduction(bool improving, int depth, int moveIndex)
 	{
-		return std::max(LmrReductions[depth][moveIndex] - IsPvNode - improving, 0);
+		return std::max(LmrReductions[depth][moveIndex] - IsPvNode + !improving, 0);
 	}
 
 	constexpr int SingularExtensionDepth = 8;
@@ -55,6 +55,13 @@ namespace Storm
 	}
 
 	constexpr int CmhPruneDepth = 3;
+
+	constexpr int ProbCutDepth = 5;
+	constexpr int ProbCutMargin = 80;
+	constexpr ValueType GetProbCutBeta(ValueType beta, bool improving)
+	{
+		return beta + ProbCutMargin - 10 * improving;
+	}
 
 	// Skill
 

@@ -26,7 +26,7 @@ namespace Storm
     }
 
     Search::Search(size_t ttSize, bool log)
-        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Settings(), m_TimeManager(), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_PvIndex(0), m_StartSearchTime(),
+        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Settings(), m_TimeManager(), m_Book(nullptr), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_PvIndex(0), m_StartSearchTime(),
         m_Stopped(false), m_ShouldStop(false), m_SearchTables(std::make_unique<SearchTables>())
     {
         ClearTable<Move, SQUARE_MAX, SQUARE_MAX>(m_SearchTables->CounterMoves, MOVE_NONE);
@@ -87,20 +87,32 @@ namespace Storm
         SearchBestMove(position, limits, callback);
     }
 
-    Move Search::SearchBestMove(const Position& position, SearchLimits limits)
+    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits)
     {
         return SearchBestMove(position, limits, {});
     }
 
-    Move Search::SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
+    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
     {
         Position pos = position;
         m_Limits = limits;
         int depth = limits.Depth < 0 ? MAX_PLY : limits.Depth;
+
+        if (!m_Limits.Infinite && m_Book != nullptr && pos.GetTotalHalfMoves() <= m_Book->GetCardinality() && m_Limits.Only.empty())
+        {
+            auto collection = m_Book->Probe(pos.Hash);
+            if (collection)
+            {
+                BookEntry entry = collection->PickRandom();
+                Move move = CreateMoveFromEntry(entry, pos);
+                m_Limits.Only.insert(move);
+            }
+        }
+
         RootMove move = SearchRoot(pos, depth, callback);
         if (move.Pv.size() > 0)
-            return move.Pv[0];
-        return MOVE_NONE;
+            return { move.Pv[0], move.Pv.size() > 1 ? move.Pv[1] : MOVE_NONE };
+        return { MOVE_NONE };
     }
 
     void Search::Stop()
@@ -136,7 +148,7 @@ namespace Storm
 
     RootMove Search::SearchRoot(Position& position, int depth, const std::function<void(const SearchResult&)>& callback)
     {
-        m_RootMoves = GenerateRootMoves(position);
+        m_RootMoves = GenerateRootMoves(position, m_Limits.Only);
         if (m_RootMoves.empty())
             return {};
 
@@ -161,7 +173,7 @@ namespace Storm
         
         ValueType alpha = -VALUE_MATE;
         ValueType beta = VALUE_MATE;
-        
+
         while (rootDepth <= depth)
         {
             for (RootMove& mv : m_RootMoves)
@@ -245,6 +257,8 @@ namespace Storm
                         std::cout << " nps " << (size_t)(m_Nodes / (elapsed.count() / 1e9f));
                         std::cout << " time " << (size_t)(elapsed.count() / 1e6f);
                         std::cout << " multipv " << (pvIndex + 1);
+                        if (m_Limits.Only.size() == 1)
+                            std::cout << " bookmove";
                         //if (hashFull >= 500)
                         //    std::cout << " hashfull " << hashFull;
                         std::cout << " pv";
@@ -342,6 +356,7 @@ namespace Storm
         SetCounterMoveHistoryPointer(cmhPtr, stack, &m_SearchTables->CounterMoveHistory, stack->Ply);
 
         Move previousMove = (stack - 1)->CurrentMove;
+        Move move;
 
         bool ttHit = false;
         ZobristHash ttHash = position.Hash;
@@ -408,7 +423,7 @@ namespace Storm
             }
 
             // Null move pruning
-            if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
+            if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 1 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
             {
                 Position movedPosition = position;
                 movedPosition.ApplyNullMove();
@@ -420,6 +435,40 @@ namespace Storm
                 if (value >= beta)
                     return IsMateScore(value) ? beta : value;
             }
+
+            // ProbCut
+            if (depth >= ProbCutDepth)
+            {
+                ValueType probCutBeta = GetProbCutBeta(beta, improving);
+                if (ttHit && ttEntry->GetDepth() >= depth - 3 && ttValue >= probCutBeta && ttMove != MOVE_NONE && position.IsCapture(ttMove))
+                    return probCutBeta;
+                MoveSelector<QUIESCENCE> selector(position);
+
+                UndoInfo undo;
+
+                while ((move = selector.GetNextMove()) != MOVE_NONE)
+                {
+                    if (move != stack->SkipMove && position.IsLegal(move))
+                    {
+                        stack->CurrentMove = move;
+                        (stack + 1)->Position = position;
+                        (stack + 1)->Position.ApplyMove(move, &undo);
+
+                        ValueType value = -QuiescenceSearch<NonPV>((stack + 1)->Position, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
+                        if (value >= probCutBeta)
+                            value = -SearchPosition<NonPV>((stack + 1)->Position, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, selDepth, !cutNode);
+
+                        if (value >= probCutBeta)
+                        {
+                            if (!(ttHit && ttEntry->GetDepth() >= depth - 3))
+                            {
+                                ttEntry->Update(ttHash, move, depth - 3, BOUND_LOWER, GetValueForTT(value, stack->Ply));
+                            }
+                            return value;
+                        }
+                    }
+                }
+            }
         }
 
         Move counterMove = m_SearchTables->CounterMoves[GetFromSquare(previousMove)][GetToSquare(previousMove)];
@@ -428,8 +477,6 @@ namespace Storm
         ValueType bestValue = -VALUE_MATE;
         Move bestMove = MOVE_NONE;
         int moveIndex = 0;
-
-        Move move;
 
         while ((move = selector.GetNextMove()) != MOVE_NONE)
         {
@@ -452,7 +499,7 @@ namespace Storm
                     if (!position.SeeGE(move, -15 * (depth - 1) * (depth - 1)))
                         continue;
                 }
-                else if (!position.SeeGE(move, -PawnValueEg * depth))
+                else if (selector.GetCurrentStage() == FIND_BAD_CAPTURES && !position.SeeGE(move, -PawnValueMg * depth))
                     continue;
             }
 
@@ -769,7 +816,7 @@ namespace Storm
         return m_ShouldStop || m_Stopped;
     }
 
-    std::vector<RootMove> Search::GenerateRootMoves(const Position& position) const
+    std::vector<RootMove> Search::GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const
     {
         Move buffer[MAX_MOVES];
         MoveList list(buffer);
@@ -777,12 +824,15 @@ namespace Storm
         std::vector<RootMove> result;
         for (Move move : list)
         {
-            RootMove mv;
-            mv.Pv = { move };
-            mv.Score = VALUE_DRAW;
-            mv.PreviousScore = VALUE_DRAW;
-            mv.SelDepth = 0;
-            result.push_back(mv);
+            if (only.empty() || only.find(move) != only.end())
+            {
+                RootMove mv;
+                mv.Pv = { move };
+                mv.Score = VALUE_DRAW;
+                mv.PreviousScore = VALUE_DRAW;
+                mv.SelDepth = 0;
+                result.push_back(mv);
+            }
         }
         return result;
     }
@@ -825,7 +875,7 @@ namespace Storm
 
         for (int i = 0; i < count; i++)
         {
-            stackPtr->Ply = count - i - 1;
+            stackPtr->Ply = -count + i + 1;
             stackPtr->PV = pv;
             stackPtr->Killers[0] = stackPtr->Killers[1] = MOVE_NONE;
             stackPtr->CurrentMove = MOVE_NONE;

@@ -13,7 +13,7 @@ namespace Storm
 	private:
 		std::unordered_map<std::string, std::function<void(const std::vector<std::string>&)>> m_CommandMap;
 
-		// OpeningBook m_OpeningBook;
+		OpeningBook m_OpeningBook;
 
 		Position m_CurrentPosition;
 		Search m_Search;
@@ -32,7 +32,7 @@ namespace Storm
 		void IsReady();
 		void NewGame();
 		void PrintBoard();
-		void SetOption(std::string name, const std::string& value);
+		void SetOption(std::string name, const std::string* value);
 		void SetPositionFen(const std::string& fen);
 		void ApplyMoves(const std::vector<std::string>& moves);
 		void Eval();
@@ -45,7 +45,7 @@ namespace Storm
 
 		// Debug helpers
 		void Moves();
-		void ProbeTT();
+		void Probe();
 
 		// Utils
 		std::unordered_set<Move> GetMoveList(const std::vector<std::string>& args, int offset) const;

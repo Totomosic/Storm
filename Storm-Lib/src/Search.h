@@ -7,6 +7,7 @@
 #include "SearchConstants.h"
 #include "SearchData.h"
 #include "TimeManager.h"
+#include "Book.h"
 
 #include <atomic>
 #include <chrono>
@@ -15,6 +16,13 @@ namespace Storm
 {
 
 	void InitSearch();
+
+	struct STORM_API BestMove
+	{
+	public:
+		Storm::Move Move;
+		Storm::Move Ponder = MOVE_NONE;
+	};
 
 	struct STORM_API SearchSettings
 	{
@@ -48,6 +56,7 @@ namespace Storm
 		std::vector<ZobristHash> m_PositionHistory;
 		SearchSettings m_Settings;
 		TimeManager m_TimeManager;
+		const OpeningBook* m_Book;
 
 		bool m_Log;
 		SearchLimits m_Limits;
@@ -67,12 +76,13 @@ namespace Storm
 		inline const SearchSettings& GetSettings() const { return m_Settings; }
 		void SetSettings(const SearchSettings& settings);
 		void PushPosition(const ZobristHash& hash);
+		inline void SetOpeningBook(const OpeningBook* book) { m_Book = book; }
 
 		size_t Perft(const Position& position, int depth);
 		void Ponder(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback = {});
 		void Ponder(const Position& position, const std::function<void(const SearchResult&)>& callback = {});
-		Move SearchBestMove(const Position& position, SearchLimits limits);
-		Move SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback);
+		BestMove SearchBestMove(const Position& position, SearchLimits limits);
+		BestMove SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback);
 
 		void Stop();
 
@@ -103,7 +113,7 @@ namespace Storm
 		constexpr int GetPliesFromMateScore(ValueType score) const { return score < 0 ? score + VALUE_MATE : VALUE_MATE - score; }
 		constexpr bool IsMateScore(ValueType score) const { return score >= MateIn(MAX_PLY) || score <= MatedIn(MAX_PLY); }
 		bool CheckLimits() const;
-		std::vector<RootMove> GenerateRootMoves(const Position& position) const;
+		std::vector<RootMove> GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const;
 		int SelectBestMoveIndex(int multipv, int skillLevel) const;
 
 		SearchStack* InitStack(SearchStack* stack, int count, const Position& position, Move* pv, ZobristHash* history) const;
