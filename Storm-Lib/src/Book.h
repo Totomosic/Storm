@@ -3,6 +3,7 @@
 #include "Position.h"
 #include "Move.h"
 
+#include <vector>
 #include <optional>
 #include <unordered_map>
 
@@ -22,7 +23,7 @@ namespace Storm
 	{
 		if (FileOf(entry.From) == FILE_E && (FileOf(entry.To) == FILE_C || FileOf(entry.To) == FILE_G) && TypeOf(position.GetPieceOnSquare(entry.From)) == PIECE_KING)
 			return CreateMove(entry.From, entry.To, CASTLE);
-		if (position.GetPieceOnSquare(entry.From) == PIECE_PAWN && RankOf(entry.To) == GetPromotionRank(position.ColorToMove))
+		if (TypeOf(position.GetPieceOnSquare(entry.From)) == PIECE_PAWN && RankOf(entry.To) == GetPromotionRank(position.ColorToMove))
 			return CreateMove(entry.From, entry.To, PIECE_QUEEN);
 		return CreateMove(entry.From, entry.To);
 	}
