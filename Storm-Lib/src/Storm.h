@@ -7,6 +7,7 @@
 #include "MoveGeneration.h"
 #include "Position.h"
 #include "Search.h"
+#include "Book.h"
 
 namespace Storm
 {

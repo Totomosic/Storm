@@ -4,6 +4,7 @@
 #include "Move.h"
 
 #include <vector>
+#include <unordered_set>
 
 namespace Storm
 {
@@ -98,6 +99,7 @@ namespace Storm
 		int Depth = -1;
 		int Milliseconds = -1;
 		int Nodes = -1;
+		std::unordered_set<Move> Only = {};
 	};
 
 	class STORM_API RootMove

@@ -71,6 +71,8 @@ namespace Storm
 		MoveSelector(const Position& position, SearchStack* stack, Move hashMove, Move counterMove, Move killers[2], SearchTables* tables);
 		MoveSelector(const Position& position);
 
+		inline MoveSelectionStage GetCurrentStage() const { return m_Stage; }
+
 		Move GetNextMove();
 
 	private:

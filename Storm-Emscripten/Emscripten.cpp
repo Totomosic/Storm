@@ -18,7 +18,7 @@ Move SearchBestMoveTime(Search& search, const Position& position, int millisecon
 	SearchLimits limits;
 	limits.Milliseconds = milliseconds;
 
-	return search.SearchBestMove(position, limits);
+	return search.SearchBestMove(position, limits).Move;
 }
 
 Move SearchBestMoveDepth(Search& search, const Position& position, int depth)
@@ -26,7 +26,7 @@ Move SearchBestMoveDepth(Search& search, const Position& position, int depth)
 	SearchLimits limits;
 	limits.Depth = depth;
 
-	return search.SearchBestMove(position, limits);
+	return search.SearchBestMove(position, limits).Move;
 }
 
 std::vector<Move> GenerateLegalMoves(const Position& position)

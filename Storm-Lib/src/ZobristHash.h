@@ -36,3 +36,18 @@ namespace Storm
 	};
 
 }
+
+namespace std
+{
+
+	template<>
+	struct hash<Storm::ZobristHash>
+	{
+	public:
+		size_t operator()(const Storm::ZobristHash& hash) const
+		{
+			return hash.Hash;
+		}
+	};
+
+}
