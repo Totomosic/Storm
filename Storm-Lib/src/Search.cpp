@@ -375,6 +375,7 @@ namespace Storm
         if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
         {
             EntryBound bound = ttEntry->GetBound();
+            STORM_ASSERT(ttEntry->GetMove() != MOVE_NONE || bound == BOUND_UPPER, "Invalid Entry");
             if ((bound == BOUND_LOWER && ttValue >= beta) || (bound == BOUND_UPPER && ttValue <= alpha) || bound == BOUND_EXACT)
             {
                 if (!position.IsCapture(ttMove))
@@ -394,14 +395,7 @@ namespace Storm
         // Static evaluation
         if (!inCheck)
         {
-            if (ttHit && ttMove != MOVE_NONE)
-            {
-                stack->StaticEvaluation = ttValue;
-            }
-            else
-            {
-                stack->StaticEvaluation = Evaluate(position);
-            }
+            stack->StaticEvaluation = Evaluate(position);
         }
 
         const bool improving = !inCheck ? stack->StaticEvaluation >= (stack - 2)->StaticEvaluation : false;
@@ -440,8 +434,6 @@ namespace Storm
             if (depth >= ProbCutDepth)
             {
                 ValueType probCutBeta = GetProbCutBeta(beta, improving);
-                if (ttHit && ttEntry->GetDepth() >= depth - 3 && ttValue >= probCutBeta && ttMove != MOVE_NONE && position.IsCapture(ttMove))
-                    return probCutBeta;
                 MoveSelector<QUIESCENCE> selector(position);
 
                 UndoInfo undo;
@@ -460,10 +452,6 @@ namespace Storm
 
                         if (value >= probCutBeta)
                         {
-                            if (!(ttHit && ttEntry->GetDepth() >= depth - 3))
-                            {
-                                ttEntry->Update(ttHash, move, depth - 3, BOUND_LOWER, GetValueForTT(value, stack->Ply));
-                            }
                             return value;
                         }
                     }
@@ -504,7 +492,7 @@ namespace Storm
             }
 
             // CMH Pruning
-            if (!IsRoot && moveIndex >= FirstMoveIndex && depth <= CmhPruneDepth)
+            if (!IsRoot && moveIndex > FirstMoveIndex && depth <= CmhPruneDepth)
             {
                 int piecePosition = position.GetPieceOnSquare(GetFromSquare(move)) * SQUARE_MAX + GetToSquare(move);
                 if ((cmhPtr[0] == nullptr || cmhPtr[0][piecePosition] < 0) && (cmhPtr[1] == nullptr || cmhPtr[1][piecePosition] < 0))
@@ -619,7 +607,7 @@ namespace Storm
                     {
                         if (!isCaptureOrPromotion)
                         {
-                            int16_t historyScore = GetHistoryValue(depth + (value > beta + 80));
+                            int16_t historyScore = GetHistoryValue(depth);
                             UpdateQuietStats(stack, move);
                             AddToHistory(position, stack, cmhPtr, m_SearchTables.get(), move, historyScore);
 
@@ -638,13 +626,14 @@ namespace Storm
         if (bestValue == -VALUE_MATE)
         {
             if (stack->SkipMove != MOVE_NONE)
-                return alpha;
-            if (inCheck)
-                return MatedIn(stack->Ply);
-            return VALUE_DRAW;
+                bestValue = alpha;
+            else if (inCheck)
+                bestValue = MatedIn(stack->Ply);
+            else
+                bestValue = VALUE_DRAW;
         }
 
-        if (stack->SkipMove == MOVE_NONE && !(IsRoot && m_PvIndex != 0))
+        if (!(IsRoot && m_PvIndex != 0))
             ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
 
         return bestValue;
@@ -676,14 +665,12 @@ namespace Storm
             return VALUE_DRAW;
 
         ZobristHash ttHash = position.Hash;
-        if (stack->SkipMove != MOVE_NONE)
-            ttHash ^= stack->SkipMove;
         bool ttHit;
         TranspositionTableEntry* ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
         Move ttMove = ttHit ? ttEntry->GetMove() : MOVE_NONE;
         ValueType ttValue = ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
 
-        if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth && !IsMateScore(ttValue))
+        if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
         {
             EntryBound bound = ttEntry->GetBound();
             if ((bound == BOUND_LOWER && ttValue >= beta) || (bound == BOUND_UPPER && ttValue <= alpha) || (bound == BOUND_EXACT))
@@ -692,10 +679,7 @@ namespace Storm
 
         if (!inCheck)
         {
-            if (ttHit)
-                stack->StaticEvaluation = ttValue;
-            else
-                stack->StaticEvaluation = Evaluate(position);
+            stack->StaticEvaluation = Evaluate(position);
                 
             if (stack->StaticEvaluation >= beta)
                 return stack->StaticEvaluation;
@@ -760,7 +744,7 @@ namespace Storm
         }
 
         if (inCheck && bestValue == -VALUE_MATE)
-            return MatedIn(stack->Ply);
+            bestValue = MatedIn(stack->Ply);
 
         ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
         return bestValue;

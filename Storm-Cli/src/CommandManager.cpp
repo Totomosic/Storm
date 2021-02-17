@@ -439,6 +439,22 @@ namespace Storm
 		{
 			std::cout << "No book entry found" << std::endl;
 		}
+
+		const TranspositionTable& tt = m_Search.GetTranspositionTable();
+		bool ttHit;
+		TranspositionTableEntry* entry = tt.GetEntry(m_CurrentPosition.Hash, ttHit);
+		if (ttHit)
+		{
+			std::cout << "Transposition Table Entry:" << std::endl;
+			std::cout << "Depth: " << entry->GetDepth() << std::endl;
+			std::cout << "Move: " << UCI::FormatMove(entry->GetMove()) << std::endl;
+			std::cout << "Score: " << entry->GetValue() << std::endl;
+			std::cout << "Bound: " << (entry->GetBound() == BOUND_EXACT ? "EXACT" : entry->GetBound() == BOUND_UPPER ? "UPPER" : "LOWER") << std::endl;
+		}
+		else
+		{
+			std::cout << "No transposition table entry found. Entry hash: " << std::hex << entry->GetHash().Hash << std::dec << std::endl;
+		}
 	}
 
 	void CommandManager::Stop()

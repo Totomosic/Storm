@@ -8,7 +8,7 @@ namespace Storm
 	constexpr int MAX_PLY = 100;
 
 	constexpr int AspirationWindowDepth = 4;
-	constexpr ValueType InitialAspirationWindow = 8;
+	constexpr ValueType InitialAspirationWindow = 12;
 
 	constexpr ValueType RazorMargin = 200;
 	constexpr int RazorDepth = 3;
@@ -54,13 +54,13 @@ namespace Storm
 		return (std::min(depth, 16) * std::min(depth, 16)) * 32;
 	}
 
-	constexpr int CmhPruneDepth = 3;
+	constexpr int CmhPruneDepth = 2;
 
 	constexpr int ProbCutDepth = 5;
-	constexpr int ProbCutMargin = 80;
+	constexpr int ProbCutMargin = 100;
 	constexpr ValueType GetProbCutBeta(ValueType beta, bool improving)
 	{
-		return beta + ProbCutMargin - 10 * improving;
+		return beta + ProbCutMargin - 20 * improving;
 	}
 
 	// Skill
