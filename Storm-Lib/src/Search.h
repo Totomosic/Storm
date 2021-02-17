@@ -74,6 +74,7 @@ namespace Storm
 		Search(size_t ttSize, bool log = true);
 
 		inline const SearchSettings& GetSettings() const { return m_Settings; }
+		inline const TranspositionTable& GetTranspositionTable() const { return m_TranspositionTable; }
 		void SetSettings(const SearchSettings& settings);
 		void PushPosition(const ZobristHash& hash);
 		inline void SetOpeningBook(const OpeningBook* book) { m_Book = book; }
