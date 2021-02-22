@@ -275,7 +275,7 @@ namespace Storm
 		if (!position.GetPieces(OtherColor(C), PIECE_QUEEN))
 			danger = std::max(danger - 100, 0);
 		mg -= danger;
-		eg -= danger / 4;
+		eg -= danger / 8;
 
 		const BitBoard pawnMask = InFrontOrEqual<C>(kingRank);
 

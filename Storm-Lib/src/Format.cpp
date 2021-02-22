@@ -375,8 +375,6 @@ namespace Storm
 							}
 							else if (tagName == "Result")
 								result = tagValue;
-							else if (tagName == "Variant")
-								std::cout << tagValue << std::endl;
 						}
 						else
 						{
@@ -430,6 +428,11 @@ namespace Storm
 								{
 									valid = true;
 									str = str.substr(str.find('.') + 1);
+									while (!str.empty() && str[0] == '.')
+										str = str.substr(1);
+									while (!str.empty() && str[0] == ' ')
+										str = str.substr(1);
+									valid = !str.empty();
 								}
 								if (valid)
 								{
