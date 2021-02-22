@@ -78,6 +78,16 @@ int PositionTotalTurns(const Position& position)
 	return position.TotalTurns;
 }
 
+bool PositionCanKingsideCastle(const Position& position, Color color)
+{
+	return position.Colors[color].CastleKingSide;
+}
+
+bool PositionCanQueensideCastle(const Position& position, Color color)
+{
+	return position.Colors[color].CastleQueenSide;
+}
+
 void PositionApplyMove(Position& position, Move move, UndoInfo& undo)
 {
 	position.ApplyMove(move, &undo);
@@ -125,6 +135,52 @@ Move CreateMoveHelper(const Position& position, SquareIndex from, SquareIndex to
 	return CreateMove(from, to);
 }
 
+enum EvaluationType
+{
+	EVAL_MATERIAL,
+	EVAL_PAWNS,
+	EVAL_KNIGHTS,
+	EVAL_BISHOPS,
+	EVAL_ROOKS,
+	EVAL_QUEENS,
+	EVAL_KING_SAFETY,
+	EVAL_SPACE,
+};
+
+ValueType EvaluationResultGetColorComponent(const EvaluationResult& result, EvaluationType type, GameStage stage, Color color)
+{
+	switch (type)
+	{
+	case EVAL_MATERIAL:
+		return result.Material[color][stage];
+	case EVAL_PAWNS:
+		return result.Pawns[color][stage];
+	case EVAL_KNIGHTS:
+		return result.Knights[color][stage];
+	case EVAL_BISHOPS:
+		return result.Bishops[color][stage];
+	case EVAL_ROOKS:
+		return result.Rooks[color][stage];
+	case EVAL_QUEENS:
+		return result.Queens[color][stage];
+	case EVAL_KING_SAFETY:
+		return result.KingSafety[color][stage];
+	case EVAL_SPACE:
+		return result.Space[color][stage];
+	}
+	return 0;
+}
+
+ValueType EvaluationResultGetComponent(const EvaluationResult& result, EvaluationType type, GameStage stage)
+{
+	return EvaluationResultGetColorComponent(result, type, stage, COLOR_WHITE) - EvaluationResultGetColorComponent(result, type, stage, COLOR_BLACK);
+}
+
+int EvaluationResultGetStage(const EvaluationResult& result)
+{
+	return result.Stage;
+}
+
 EMSCRIPTEN_BINDINGS(Storm) {
 	register_vector<Move>("MoveList");
 	register_vector<PGNMatch>("MatchList");
@@ -134,6 +190,7 @@ EMSCRIPTEN_BINDINGS(Storm) {
 	constant("VALUE_NONE", VALUE_NONE);
 	constant("VALUE_DRAW", VALUE_DRAW);
 	constant("MOVE_NONE", MOVE_NONE);
+	constant("GAME_STAGE_MAX", GameStageMax);
 
 	function("Init", &Init);
 	function("PrintPosition", &PrintPosition);
@@ -157,6 +214,30 @@ EMSCRIPTEN_BINDINGS(Storm) {
 
 	function("CreateSquare", &CreateSquare);
 
+	enum_<EvaluationType>("Evaluation")
+		.value("Material", EVAL_MATERIAL)
+		.value("Pawns", EVAL_PAWNS)
+		.value("Knights", EVAL_KNIGHTS)
+		.value("Bishops", EVAL_BISHOPS)
+		.value("Rooks", EVAL_ROOKS)
+		.value("Queens", EVAL_QUEENS)
+		.value("KingSafety", EVAL_KING_SAFETY)
+		.value("Space", EVAL_SPACE);
+
+	class_<EvaluationResult>("EvaluationResult")
+		.property("Stage", &EvaluationResultGetStage)
+		.function("GetComponent", &EvaluationResultGetComponent)
+		.function("GetColorComponent", &EvaluationResultGetColorComponent)
+		.function("GetMidgameTotal", &EvaluationResult::GetStageTotal<MIDGAME>)
+		.function("GetEndgameTotal", &EvaluationResult::GetStageTotal<ENDGAME>)
+		.function("Result", &EvaluationResult::Result);
+
+	function("EvaluateDetailed", &EvaluateDetailed);
+	function("Evaluate", &Evaluate);
+
+	enum_<GameStage>("GameStage")
+		.value("Midgame", MIDGAME)
+		.value("Endgame", ENDGAME);
 	enum_<Color>("Color")
 		.value("White", COLOR_WHITE)
 		.value("Black", COLOR_BLACK);
@@ -304,6 +385,8 @@ EMSCRIPTEN_BINDINGS(Storm) {
 		.function("GetColorOnSquare", &Position::GetColorOnSquare)
 		.function("IsCapture", &Position::IsCapture)
 		.function("IsEnpassant", &Position::IsEnpassant)
+		.function("CanKingsideCastle", &PositionCanKingsideCastle)
+		.function("CanQueensideCastle", &PositionCanQueensideCastle)
 		.function("ApplyMove", &PositionApplyMove)
 		.function("DeepClone", &PositionClone);
 	value_object<SearchLimits>("SearchLimits")

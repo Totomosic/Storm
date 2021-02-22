@@ -8,7 +8,7 @@ namespace Storm
 	constexpr int MAX_PLY = 100;
 
 	constexpr int AspirationWindowDepth = 4;
-	constexpr ValueType InitialAspirationWindow = 12;
+	constexpr ValueType InitialAspirationWindow = 8;
 
 	constexpr ValueType RazorMargin = 200;
 	constexpr int RazorDepth = 3;
@@ -33,7 +33,7 @@ namespace Storm
 	template<bool IsPvNode>
 	inline int GetLmrReduction(bool improving, int depth, int moveIndex)
 	{
-		return std::max(LmrReductions[depth][moveIndex] - IsPvNode + !improving, 0);
+		return std::max(LmrReductions[depth][moveIndex] - IsPvNode - improving, 0);
 	}
 
 	constexpr int SingularExtensionDepth = 8;
@@ -54,7 +54,7 @@ namespace Storm
 		return (std::min(depth, 16) * std::min(depth, 16)) * 32;
 	}
 
-	constexpr int CmhPruneDepth = 2;
+	constexpr int CmhPruneDepth = 3;
 
 	constexpr int ProbCutDepth = 5;
 	constexpr int ProbCutMargin = 100;

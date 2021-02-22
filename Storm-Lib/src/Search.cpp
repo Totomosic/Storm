@@ -417,7 +417,7 @@ namespace Storm
             }
 
             // Null move pruning
-            if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 1 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
+            if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
             {
                 Position movedPosition = position;
                 movedPosition.ApplyNullMove();
@@ -487,7 +487,7 @@ namespace Storm
                     if (!position.SeeGE(move, -15 * (depth - 1) * (depth - 1)))
                         continue;
                 }
-                else if (selector.GetCurrentStage() == FIND_BAD_CAPTURES && !position.SeeGE(move, -PawnValueMg * depth))
+                else if (!position.SeeGE(move, -PawnValueMg * depth))
                     continue;
             }
 
@@ -626,11 +626,10 @@ namespace Storm
         if (bestValue == -VALUE_MATE)
         {
             if (stack->SkipMove != MOVE_NONE)
-                bestValue = alpha;
-            else if (inCheck)
-                bestValue = MatedIn(stack->Ply);
-            else
-                bestValue = VALUE_DRAW;
+                return alpha;
+            if (inCheck)
+                return MatedIn(stack->Ply);
+            return VALUE_DRAW;
         }
 
         if (!(IsRoot && m_PvIndex != 0))
@@ -670,7 +669,7 @@ namespace Storm
         Move ttMove = ttHit ? ttEntry->GetMove() : MOVE_NONE;
         ValueType ttValue = ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
 
-        if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
+        if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth && !IsMateScore(ttValue))
         {
             EntryBound bound = ttEntry->GetBound();
             if ((bound == BOUND_LOWER && ttValue >= beta) || (bound == BOUND_UPPER && ttValue <= alpha) || (bound == BOUND_EXACT))
@@ -744,7 +743,7 @@ namespace Storm
         }
 
         if (inCheck && bestValue == -VALUE_MATE)
-            bestValue = MatedIn(stack->Ply);
+            return MatedIn(stack->Ply);
 
         ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
         return bestValue;
