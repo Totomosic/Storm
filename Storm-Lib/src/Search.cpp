@@ -13,7 +13,7 @@ namespace Storm
         {
             for (int index = 0; index < MAX_MOVES; index++)
             {
-                LmrReductions[depth][index] = int(1.0 + std::log(depth) + std::log(index) * 0.5);
+                LmrReductions[depth][index] = int(std::round(1.0 + std::log(depth) + std::log(index) * 0.5));
             }
         }
     }
@@ -208,7 +208,7 @@ namespace Storm
 
                     std::stable_sort(m_RootMoves.begin() + pvIndex, m_RootMoves.end());
 
-                    delta += delta / 2 + 2;
+                    delta += delta / 2;
 
                     if (value <= alpha && value != -VALUE_MATE)
                     {

@@ -8,7 +8,7 @@ namespace Storm
 	constexpr int MAX_PLY = 100;
 
 	constexpr int AspirationWindowDepth = 4;
-	constexpr ValueType InitialAspirationWindow = 8;
+	constexpr ValueType InitialAspirationWindow = 15;
 
 	constexpr ValueType RazorMargin = 200;
 	constexpr int RazorDepth = 3;

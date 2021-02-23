@@ -16,6 +16,11 @@ namespace Storm
 			IsReady();
 		};
 
+		m_CommandMap["uci"] = [this](const std::vector<std::string>& args)
+		{
+			Uci();
+		};
+
 		m_CommandMap["ucinewgame"] = [this](const std::vector<std::string>& args)
 		{
 			NewGame();
@@ -110,7 +115,7 @@ namespace Storm
 		{
 			if (args.size() > 0)
 			{
-				if (args[0] == "ponder")
+				if (args[0] == "ponder" || args[0] == "infinite")
 				{
 					GoPonder(GetMoveList(args, 1));
 				}
@@ -214,6 +219,8 @@ namespace Storm
 		std::cout << "\t\tSearch the current position to a given depth." << std::endl;
 		std::cout << "\t* movetime <time_ms>" << std::endl;
 		std::cout << "\t\tSearch the current position for a given number of milliseconds." << std::endl;
+		std::cout << "\t* infinite" << std::endl;
+		std::cout << "\t\tSearch the current position until told to stop." << std::endl;
 		std::cout << "* moves" << std::endl;
 		std::cout << "\tShow information about the legal moves in the current position." << std::endl;
 		std::cout << "* stop" << std::endl;
@@ -229,6 +236,16 @@ namespace Storm
 	void CommandManager::IsReady()
 	{
 		std::cout << "readyok" << std::endl;
+	}
+
+	void CommandManager::Uci()
+	{
+		std::cout << "id name Storm" << std::endl;
+		std::cout << "id author Jordan Morrison" << std::endl;
+		std::cout << "option name MultiPV type spin default 1 min 1 max 100" << std::endl;
+		std::cout << "option name Skill Level type spin default 20 min 1 max 20" << std::endl;
+
+		std::cout << "uciok" << std::endl;
 	}
 
 	void CommandManager::NewGame()
