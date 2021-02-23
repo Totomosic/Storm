@@ -3,9 +3,9 @@ workspace "Storm"
 
     configurations
     {
+        "Dist",
         "Debug",
         "Release",
-        "Dist"
     }
 
     flags
