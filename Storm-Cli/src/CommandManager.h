@@ -29,6 +29,7 @@ namespace Storm
 
 	private:
 		void Help();
+		void Uci();
 		void IsReady();
 		void NewGame();
 		void PrintBoard();
