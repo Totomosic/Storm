@@ -154,10 +154,8 @@ namespace Storm
 
         m_Stopped = false;
         m_ShouldStop = false;
-        if (m_Limits.Milliseconds > 0 && !m_Limits.Infinite)
-            m_TimeManager.SetMillisecondsToMove(m_Limits.Milliseconds);
-        else
-            m_TimeManager.Disable();
+       
+        SetTimeManagementFromLimits(position, m_Limits);
         m_TimeManager.StartSearch();
         int rootDepth = 1;
 
@@ -844,6 +842,27 @@ namespace Storm
             }
         }
         return bestIndex;
+    }
+
+    void Search::SetTimeManagementFromLimits(const Position& position, const SearchLimits& limits)
+    {
+        if (m_Limits.Milliseconds > 0 && !m_Limits.Infinite)
+            m_TimeManager.SetMillisecondsToMove(m_Limits.Milliseconds);
+        else
+        {
+            int colorTime = position.ColorToMove == COLOR_WHITE ? limits.WhiteTime : limits.BlackTime;
+            int colorIncrement = position.ColorToMove == COLOR_WHITE ? limits.WhiteIncrement : limits.BlackIncrement;
+            int allocatedTime = 0;
+
+            if (limits.MovesToGo > 0)
+                allocatedTime = colorTime / (limits.MovesToGo + 1) * 3 / 2;
+            else if (colorIncrement > 0)
+                allocatedTime = int(colorTime * (1 + position.TotalTurns / 40.0f) / 16 + colorIncrement);
+            else
+                allocatedTime = colorTime / 20;
+
+            m_TimeManager.SetMillisecondsToMove(allocatedTime);
+        }
     }
 
     SearchStack* Search::InitStack(SearchStack* stack, int count, const Position& position, Move* pv, ZobristHash* history) const

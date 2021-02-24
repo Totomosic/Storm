@@ -91,14 +91,21 @@ namespace Storm
 			}
 		}
 	}
+	
+	constexpr int InvalidLimit = -1;
 
 	struct STORM_API SearchLimits
 	{
 	public:
 		bool Infinite = false;
-		int Depth = -1;
-		int Milliseconds = -1;
-		int Nodes = -1;
+		int Depth = InvalidLimit;
+		int Milliseconds = InvalidLimit;
+		int Nodes = InvalidLimit;
+		int WhiteTime = InvalidLimit;
+		int BlackTime = InvalidLimit;
+		int WhiteIncrement = InvalidLimit;
+		int BlackIncrement = InvalidLimit;
+		int MovesToGo = InvalidLimit;
 		std::unordered_set<Move> Only = {};
 	};
 
