@@ -38,9 +38,7 @@ namespace Storm
 		void ApplyMoves(const std::vector<std::string>& moves);
 		void Eval();
 		void Perft(int depth);
-		void GoDepth(int depth, const std::unordered_set<Move>& includedMoves);
-		void GoTime(int milliseconds, const std::unordered_set<Move>& includedMoves);
-		void GoPonder(const std::unordered_set<Move>& includedMoves);
+		void Go(const std::vector<std::string>& args);
 		void Stop();
 		void Quit();
 

@@ -113,26 +113,7 @@ namespace Storm
 
 		m_CommandMap["go"] = [this](const std::vector<std::string>& args)
 		{
-			if (args.size() > 0)
-			{
-				if (args[0] == "ponder" || args[0] == "infinite")
-				{
-					GoPonder(GetMoveList(args, 1));
-				}
-				else if (args.size() > 1)
-				{
-					if (args[0] == "depth")
-					{
-						int depth = std::stoi(args[1]);
-						GoDepth(depth, GetMoveList(args, 2));
-					}
-					else if (args[0] == "movetime")
-					{
-						int milliseconds = std::stoi(args[1]);
-						GoTime(milliseconds, GetMoveList(args, 2));
-					}
-				}
-			}
+			Go(args);
 		};
 
 		m_CommandMap["moves"] = [this](const std::vector<std::string>& args)
@@ -356,64 +337,60 @@ namespace Storm
 		}
 	}
 
-	void CommandManager::GoDepth(int depth, const std::unordered_set<Move>& includedMoves)
+	void CommandManager::Go(const std::vector<std::string>& args)
 	{
-		if (!m_Searching)
+		if (args.size() > 0)
 		{
-			m_Searching = true;
-			if (m_SearchThread.joinable())
-				m_SearchThread.join();
-			m_SearchThread = std::thread([this, depth, includedMoves]()
-			{
-				SearchLimits limits;
-				limits.Depth = depth;
-				// limits.Only = includedMoves;
-				BestMove bestMove = m_Search.SearchBestMove(m_CurrentPosition, limits);
-				std::cout << "bestmove " << UCI::FormatMove(bestMove.Move);
-				if (bestMove.Ponder != MOVE_NONE)
-					std::cout << " ponder " << UCI::FormatMove(bestMove.Ponder);
-				std::cout << std::endl;
-				m_Searching = false;
-			});
-		}
-	}
+			SearchLimits limits;
 
-	void CommandManager::GoTime(int milliseconds, const std::unordered_set<Move>& includedMoves)
-	{
-		if (!m_Searching)
-		{
-			m_Searching = true;
-			if (m_SearchThread.joinable())
-				m_SearchThread.join();
-			m_SearchThread = std::thread([this, milliseconds, includedMoves]()
+			size_t moveStartIndex = 0;
+			for (size_t i = 0; i < args.size(); i++)
 			{
-				SearchLimits limits;
-				limits.Milliseconds = milliseconds;
-				// limits.Only = includedMoves;
-				BestMove bestMove = m_Search.SearchBestMove(m_CurrentPosition, limits);
-				std::cout << "bestmove " << UCI::FormatMove(bestMove.Move);
-				if (bestMove.Ponder != MOVE_NONE)
-					std::cout << " ponder " << UCI::FormatMove(bestMove.Ponder);
-				std::cout << std::endl;
-				m_Searching = false;
-			});
-		}
-	}
+				const std::string& token = args[i];
+				if (token == "wtime" && i + 1 < args.size())
+					limits.WhiteTime = std::stoi(args[++i]);
+				else if (token == "btime" && i + 1 < args.size())
+					limits.BlackTime = std::stoi(args[++i]);
+				else if (token == "winc" && i + 1 < args.size())
+					limits.WhiteIncrement = std::stoi(args[++i]);
+				else if (token == "binc" && i + 1 < args.size())
+					limits.BlackIncrement = std::stoi(args[++i]);
+				else if (token == "movestogo" && i + 1 < args.size())
+					limits.MovesToGo = std::stoi(args[++i]);
 
-	void CommandManager::GoPonder(const std::unordered_set<Move>& includedMoves)
-	{
-		if (!m_Searching)
-		{
-			m_Searching = true;
-			if (m_SearchThread.joinable())
-				m_SearchThread.join();
-			m_SearchThread = std::thread([this, includedMoves]()
+				else if (token == "movetime" && i + 1 < args.size())
+					limits.Milliseconds = std::stoi(args[++i]);
+				else if (token == "depth" && i + 1 < args.size())
+					limits.Depth = std::stoi(args[++i]);
+				else if (token == "nodes" && i + 1 < args.size())
+					limits.Nodes = std::stoi(args[++i]);
+
+				else if (token == "infinite" || token == "ponder")
+					limits.Infinite = true;
+				else
+				{
+					moveStartIndex = i;
+					break;
+				}
+			}
+
+			if (!m_Searching)
 			{
-				SearchLimits limits;
-				// limits.Only = includedMoves;
-				m_Search.Ponder(m_CurrentPosition, limits);
-				m_Searching = false;
-			});
+				std::unordered_set<Move> includedMoves = moveStartIndex > 0 ? GetMoveList(args, moveStartIndex) : std::unordered_set<Move>{};
+				limits.Only = includedMoves;
+				m_Searching = true;
+				if (m_SearchThread.joinable())
+					m_SearchThread.join();
+				m_SearchThread = std::thread([this, limits]()
+				{
+					BestMove bestMove = m_Search.SearchBestMove(m_CurrentPosition, limits);
+					std::cout << "bestmove " << UCI::FormatMove(bestMove.Move);
+					if (bestMove.Ponder != MOVE_NONE)
+						std::cout << " ponder " << UCI::FormatMove(bestMove.Ponder);
+					std::cout << std::endl;
+					m_Searching = false;
+				});
+			}
 		}
 	}
 

@@ -116,6 +116,7 @@ namespace Storm
 		bool CheckLimits() const;
 		std::vector<RootMove> GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const;
 		int SelectBestMoveIndex(int multipv, int skillLevel) const;
+		void SetTimeManagementFromLimits(const Position& position, const SearchLimits& limits);
 
 		SearchStack* InitStack(SearchStack* stack, int count, const Position& position, Move* pv, ZobristHash* history) const;
 
