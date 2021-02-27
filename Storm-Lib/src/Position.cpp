@@ -61,9 +61,14 @@ namespace Storm
 		return ApplyMove(move, undo, GivesCheck(move));
 	}
 
-	void Position::ApplyNullMove()
+	void Position::UndoMove(const UndoInfo& undo)
+	{
+	}
+
+	void Position::ApplyNullMove(UndoInfo* undo)
 	{
 		STORM_ASSERT(!GetCheckers(), "Cannot be in check");
+		undo->EnpassantSquare = EnpassantSquare;
 		if (EnpassantSquare != SQUARE_INVALID)
 		{
 			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
@@ -77,6 +82,23 @@ namespace Storm
 		if (ColorToMove == COLOR_BLACK)
 			TotalTurns++;
 
+		ColorToMove = OtherColor(ColorToMove);
+		Hash.FlipTeamToPlay();
+	}
+
+	void Position::UndoNullMove(const UndoInfo& undo)
+	{
+		if (undo.EnpassantSquare != SQUARE_INVALID)
+		{
+			Hash.AddEnPassant(FileOf(undo.EnpassantSquare));
+			EnpassantSquare = undo.EnpassantSquare;
+		}
+		Cache.CheckedBy = ZERO_BB;
+
+		HalfTurnsSinceCaptureOrPush--;
+
+		if (ColorToMove == COLOR_BLACK)
+			TotalTurns--;
 		ColorToMove = OtherColor(ColorToMove);
 		Hash.FlipTeamToPlay();
 	}

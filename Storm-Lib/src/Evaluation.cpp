@@ -292,6 +292,11 @@ namespace Storm
 				SquareIndex index = CreateSquare(file, RelativeRank<C>(RankOf(advancedPawn)));
 				mg += PawnShield[index];
 			}
+			else
+			{
+				// Special value used when there is no pawn
+				mg += PawnShield[CreateSquare(file, RANK_1)];
+			}
 
 			BitBoard enemyPawns = position.GetPieces(OtherColor(C), PIECE_PAWN) & FILE_MASKS[file] & pawnMask;
 			while (enemyPawns)
