@@ -61,53 +61,6 @@ namespace Storm
 		return ApplyMove(move, undo, GivesCheck(move));
 	}
 
-	void Position::UndoMove(const UndoInfo& undo)
-	{
-	}
-
-	void Position::ApplyNullMove(UndoInfo* undo)
-	{
-		STORM_ASSERT(!GetCheckers(), "Cannot be in check");
-		undo->EnpassantSquare = EnpassantSquare;
-		if (EnpassantSquare != SQUARE_INVALID)
-		{
-			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
-			EnpassantSquare = SQUARE_INVALID;
-		}
-		Cache.CheckedBy = ZERO_BB;
-		UpdateCheckInfo(ColorToMove);
-
-		HalfTurnsSinceCaptureOrPush++;
-
-		if (ColorToMove == COLOR_BLACK)
-			TotalTurns++;
-
-		ColorToMove = OtherColor(ColorToMove);
-		Hash.FlipTeamToPlay();
-	}
-
-	void Position::UndoNullMove(const UndoInfo& undo)
-	{
-		if (undo.EnpassantSquare != SQUARE_INVALID)
-		{
-			Hash.AddEnPassant(FileOf(undo.EnpassantSquare));
-			EnpassantSquare = undo.EnpassantSquare;
-		}
-		Cache.CheckedBy = ZERO_BB;
-
-		HalfTurnsSinceCaptureOrPush--;
-
-		if (ColorToMove == COLOR_BLACK)
-			TotalTurns--;
-		ColorToMove = OtherColor(ColorToMove);
-		Hash.FlipTeamToPlay();
-	}
-
-	bool Position::IsPseudoLegal(Move move) const
-	{
-		return true;
-	}
-
 	void Position::ApplyMove(Move move, UndoInfo* undo, bool givesCheck)
 	{
 		STORM_ASSERT(ValidMove(move), "Invalid move");
@@ -127,6 +80,19 @@ namespace Storm
 		const Color otherColor = OtherColor(ColorToMove);
 		const Rank otherBackRank = otherColor == COLOR_WHITE ? RANK_1 : RANK_8;
 		const Rank castleRank = ColorToMove == COLOR_WHITE ? RANK_1 : RANK_8;
+
+		undo->EnpassantSquare = EnpassantSquare;
+		undo->CapturedPiece = capturedPiece;
+		undo->HalfTurnsSinceCaptureOrPush = HalfTurnsSinceCaptureOrPush;
+		undo->CastlingRights[0] = Colors[COLOR_WHITE].CastleKingSide;
+		undo->CastlingRights[1] = Colors[COLOR_WHITE].CastleQueenSide;
+		undo->CastlingRights[2] = Colors[COLOR_BLACK].CastleKingSide;
+		undo->CastlingRights[3] = Colors[COLOR_BLACK].CastleQueenSide;
+		undo->CheckedBy = Cache.CheckedBy;
+		memcpy(undo->BlockersForKing, Cache.BlockersForKing, sizeof(undo->BlockersForKing));
+		memcpy(undo->Pinners, Cache.Pinners, sizeof(undo->Pinners));
+		for (int i = 0; i < PIECE_COUNT; i++)
+			undo->CheckSquares[i] = Cache.CheckSquares[otherColor][i];
 
 		if (EnpassantSquare != SQUARE_INVALID)
 		{
@@ -251,6 +217,148 @@ namespace Storm
 
 		ColorToMove = otherColor;
 		Hash.FlipTeamToPlay();
+	}
+
+	void Position::UndoMove(Move move, const UndoInfo& undo)
+	{
+		const Color movingColor = OtherColor(ColorToMove);
+		const Color otherColor = ColorToMove;
+		const SquareIndex fromSquare = GetToSquare(move);
+		const SquareIndex toSquare = GetFromSquare(move);
+		const Piece capturedPiece = undo.CapturedPiece;
+		const Piece movingPiece = TypeOf(GetPieceOnSquare(fromSquare));
+		const MoveType moveType = GetMoveType(move);
+		const bool isPromotion = moveType == PROMOTION;
+		const bool isEnpassant = fromSquare == undo.EnpassantSquare && movingPiece == PIECE_PAWN;
+		const bool isCastle = moveType == CASTLE;
+
+		if (EnpassantSquare != SQUARE_INVALID)
+			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
+		if (undo.EnpassantSquare != SQUARE_INVALID)
+			Hash.AddEnPassant(FileOf(undo.EnpassantSquare));
+		EnpassantSquare = undo.EnpassantSquare;
+
+		MovePiece(movingColor, movingPiece, fromSquare, toSquare);
+		if (capturedPiece != PIECE_NONE)
+		{
+			AddPiece(otherColor, capturedPiece, fromSquare);
+		}
+		if (isPromotion)
+		{
+			RemovePiece(movingColor, movingPiece, toSquare);
+			AddPiece(movingColor, PIECE_PAWN, toSquare);
+		}
+		if (isEnpassant)
+		{
+			AddPiece(otherColor, PIECE_PAWN, GetEnpassantSquare(undo.EnpassantSquare, movingColor));
+		}
+		if (isCastle)
+		{
+			const bool isKingside = FileOf(fromSquare) == FILE_G;
+			const Rank fromRank = RankOf(fromSquare);
+			if (isKingside)
+			{
+				MovePiece(movingColor, PIECE_ROOK, CreateSquare(FILE_F, fromRank), CreateSquare(FILE_H, fromRank));
+			}
+			else
+			{
+				MovePiece(movingColor, PIECE_ROOK, CreateSquare(FILE_D, fromRank), CreateSquare(FILE_A, fromRank));
+			}
+		}
+
+		if (undo.CastlingRights[0] != Colors[COLOR_WHITE].CastleKingSide)
+		{
+			Colors[COLOR_WHITE].CastleKingSide = undo.CastlingRights[0];
+			Hash.AddCastleKingside(COLOR_WHITE);
+		}
+		if (undo.CastlingRights[1] != Colors[COLOR_WHITE].CastleQueenSide)
+		{
+			Colors[COLOR_WHITE].CastleQueenSide = undo.CastlingRights[1];
+			Hash.AddCastleQueenside(COLOR_WHITE);
+		}
+		if (undo.CastlingRights[2] != Colors[COLOR_BLACK].CastleKingSide)
+		{
+			Colors[COLOR_BLACK].CastleKingSide = undo.CastlingRights[2];
+			Hash.AddCastleKingside(COLOR_BLACK);
+		}
+		if (undo.CastlingRights[3] != Colors[COLOR_BLACK].CastleQueenSide)
+		{
+			Colors[COLOR_BLACK].CastleQueenSide = undo.CastlingRights[3];
+			Hash.AddCastleQueenside(COLOR_BLACK);
+		}
+
+		if (movingPiece == PIECE_KING)
+			Cache.KingSquare[movingColor] = toSquare;
+
+		Cache.CheckedBy = undo.CheckedBy;
+		memcpy(Cache.BlockersForKing, undo.BlockersForKing, sizeof(undo.BlockersForKing));
+		memcpy(Cache.Pinners, undo.Pinners, sizeof(undo.Pinners));
+		for (int i = 0; i < PIECE_COUNT; i++)
+			Cache.CheckSquares[otherColor][i] = undo.CheckSquares[i];
+
+		if (movingColor == COLOR_BLACK)
+			TotalTurns--;
+		HalfTurnsSinceCaptureOrPush = undo.HalfTurnsSinceCaptureOrPush;
+
+		ColorToMove = movingColor;
+		Hash.FlipTeamToPlay();
+	}
+
+	void Position::ApplyNullMove(UndoInfo* undo)
+	{
+		STORM_ASSERT(!GetCheckers(), "Cannot be in check");
+		const Color otherColor = OtherColor(ColorToMove);
+
+		// CheckedBy is guaranteed to be ZERO_BB so no need to save it
+		// Castling is not affected by null move so no need to save it
+		memcpy(undo->BlockersForKing, Cache.BlockersForKing, sizeof(undo->BlockersForKing));
+		memcpy(undo->Pinners, Cache.Pinners, sizeof(undo->Pinners));
+		for (int i = 0; i < PIECE_COUNT; i++)
+			undo->CheckSquares[i] = Cache.CheckSquares[otherColor][i];
+
+		undo->EnpassantSquare = EnpassantSquare;
+		if (EnpassantSquare != SQUARE_INVALID)
+		{
+			Hash.RemoveEnPassant(FileOf(EnpassantSquare));
+			EnpassantSquare = SQUARE_INVALID;
+		}
+		Cache.CheckedBy = ZERO_BB;
+		UpdateCheckInfo(ColorToMove);
+
+		HalfTurnsSinceCaptureOrPush++;
+
+		if (ColorToMove == COLOR_BLACK)
+			TotalTurns++;
+
+		ColorToMove = OtherColor(ColorToMove);
+		Hash.FlipTeamToPlay();
+	}
+
+	void Position::UndoNullMove(const UndoInfo& undo)
+	{
+		if (undo.EnpassantSquare != SQUARE_INVALID)
+		{
+			Hash.AddEnPassant(FileOf(undo.EnpassantSquare));
+			EnpassantSquare = undo.EnpassantSquare;
+		}
+		Cache.CheckedBy = ZERO_BB;
+
+		memcpy(Cache.BlockersForKing, undo.BlockersForKing, sizeof(undo.BlockersForKing));
+		memcpy(Cache.Pinners, undo.Pinners, sizeof(undo.Pinners));
+		for (int i = 0; i < PIECE_COUNT; i++)
+			Cache.CheckSquares[ColorToMove][i] = undo.CheckSquares[i];
+
+		HalfTurnsSinceCaptureOrPush--;
+
+		if (ColorToMove == COLOR_BLACK)
+			TotalTurns--;
+		ColorToMove = OtherColor(ColorToMove);
+		Hash.FlipTeamToPlay();
+	}
+
+	bool Position::IsPseudoLegal(Move move) const
+	{
+		return true;
 	}
 
 	bool Position::GivesCheck(Move move) const
