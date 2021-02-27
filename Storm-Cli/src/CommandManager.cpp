@@ -4,7 +4,7 @@ namespace Storm
 {
 
 	CommandManager::CommandManager()
-		: m_CommandMap(), m_OpeningBook(), m_CurrentPosition(CreateStartingPosition()), m_Search(128 * 1024 * 1024), m_Searching(false), m_SearchThread()
+		: m_CommandMap(), m_OpeningBook(), m_CurrentPosition(CreateStartingPosition()), m_Search(128 * 1024 * 1024), m_Searching(false), m_SearchThread(), m_UndoMove(MOVE_NONE), m_Undo()
 	{
 		m_CommandMap["help"] = [this](const std::vector<std::string>& args)
 		{
@@ -134,6 +134,17 @@ namespace Storm
 		m_CommandMap["quit"] = [this](const std::vector<std::string>& args)
 		{
 			Quit();
+		};
+
+		m_CommandMap["undo"] = [this](const std::vector<std::string>& args)
+		{
+			if (m_UndoMove != MOVE_NONE && !m_Searching)
+			{
+				m_CurrentPosition.UndoMove(m_UndoMove, m_Undo);
+				m_UndoMove = MOVE_NONE;
+			}
+			else
+				std::cout << "Cannot Undo" << std::endl;
 		};
 
 		ExecuteCommand("ucinewgame");
@@ -285,7 +296,6 @@ namespace Storm
 	void CommandManager::ApplyMoves(const std::vector<std::string>& moves)
 	{
 		Move moveBuffer[MAX_MOVES];
-		UndoInfo undo;
 		if (!m_Searching)
 		{
 			for (const std::string& moveString : moves)
@@ -306,7 +316,8 @@ namespace Storm
 					{
 						if (m_CurrentPosition.IsLegal(move))
 						{
-							m_CurrentPosition.ApplyMove(move, &undo);
+							m_CurrentPosition.ApplyMove(move, &m_Undo);
+							m_UndoMove = move;
 							m_Search.PushPosition(m_CurrentPosition.Hash);
 							legal = true;
 						}

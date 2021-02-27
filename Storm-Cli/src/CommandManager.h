@@ -21,6 +21,9 @@ namespace Storm
 		std::atomic<bool> m_Searching;
 		std::thread m_SearchThread;
 
+		Move m_UndoMove;
+		UndoInfo m_Undo;
+
 	public:
 		CommandManager();
 		~CommandManager();

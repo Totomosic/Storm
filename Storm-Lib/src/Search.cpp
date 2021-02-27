@@ -2,6 +2,8 @@
 #include <chrono>
 #include <random>
 
+#define STORM_USE_UNDO 1
+
 namespace Storm
 {
 
@@ -44,8 +46,9 @@ namespace Storm
         m_PositionHistory.push_back(hash);
     }
 
-    size_t Search::Perft(const Position& position, int depth)
+    size_t Search::Perft(const Position& pos, int depth)
     {
+        Position position = pos;
         UndoInfo undo;
         size_t total = 0;
         Move moves[MAX_MOVES];
@@ -56,9 +59,16 @@ namespace Storm
 
         for (Move move : moveList)
         {
+#if !STORM_USE_UNDO
             Position movedPosition = position;
             movedPosition.ApplyMove(move, &undo);
             size_t perft = PerftPosition(movedPosition, depth - 1);
+#else
+            position.ApplyMove(move, &undo);
+            size_t perft = PerftPosition(position, depth - 1);
+            position.UndoMove(move, undo);
+#endif
+            
             total += perft;
 
             if (m_Log)
@@ -139,9 +149,16 @@ namespace Storm
         size_t nodes = 0;
         while (it != end)
         {
+#if !STORM_USE_UNDO
             Position movedPosition = position;
             movedPosition.ApplyMove(*it++, &undo);
             nodes += PerftPosition(movedPosition, depth - 1);
+#else
+            Move move = *it++;
+            position.ApplyMove(move, &undo);
+            nodes += PerftPosition(position, depth - 1);
+            position.UndoMove(move, undo);
+#endif
         }
         return nodes;
     }
@@ -396,6 +413,7 @@ namespace Storm
                 UndoInfo undo;
                 position.ApplyNullMove(&undo);
 
+                (stack + 1)->Position = position;
                 stack->CurrentMove = MOVE_NONE;
                 stack->MoveCount = FirstMoveIndex;
 
@@ -418,12 +436,28 @@ namespace Storm
                     if (move != stack->SkipMove && position.IsLegal(move))
                     {
                         stack->CurrentMove = move;
+#if !STORM_USE_UNDO
                         (stack + 1)->Position = position;
                         (stack + 1)->Position.ApplyMove(move, &undo);
-
                         ValueType value = -QuiescenceSearch<NonPV>((stack + 1)->Position, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
+#else
+                        position.ApplyMove(move, &undo);
+                        (stack + 1)->Position = position;
+                        ValueType value = -QuiescenceSearch<NonPV>(position, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
+#endif
+
                         if (value >= probCutBeta)
+                        {
+#if !STORM_USE_UNDO
                             value = -SearchPosition<NonPV>((stack + 1)->Position, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, selDepth, !cutNode);
+#else
+                            value = -SearchPosition<NonPV>(position, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, selDepth, !cutNode);
+#endif
+                        }
+
+#if STORM_USE_UNDO
+                        position.UndoMove(move, undo);
+#endif
 
                         if (value >= probCutBeta)
                         {
@@ -512,9 +546,18 @@ namespace Storm
 
             newDepth += depthExtension;
 
+            size_t preHash = position.Hash.Hash;
+
+#if !STORM_USE_UNDO
             (stack + 1)->Position = position;
             (stack + 1)->Position.ApplyMove(move, &undo, givesCheck);
+#else
+            position.ApplyMove(move, &undo, givesCheck);
+            (stack + 1)->Position = position;
+#endif
             m_Nodes++;
+
+            size_t postHash = position.Hash.Hash;
 
             stack->CurrentMove = move;
 
@@ -527,10 +570,15 @@ namespace Storm
                 if ((stack - 1)->MoveCount > 13)
                     reduction--;
 
-                reduction -= 2 * GetHistoryScore(stack, position, cmhPtr, move, m_SearchTables.get()) / MAX_HISTORY_SCORE;
+                reduction -= 2 * GetHistoryScore(stack, stack->Position, cmhPtr, move, m_SearchTables.get()) / MAX_HISTORY_SCORE;
 
                 int lmrDepth = std::clamp(newDepth - reduction, 1, newDepth);
+#if !STORM_USE_UNDO
                 value = -SearchPosition<NonPV>((stack + 1)->Position, stack + 1, lmrDepth, -(alpha + 1), -alpha, selDepth, true);
+#else
+                value = -SearchPosition<NonPV>(position, stack + 1, lmrDepth, -(alpha + 1), -alpha, selDepth, true);
+                STORM_ASSERT(position.Hash.Hash == postHash, "Invalid");
+#endif
                 fullDepthSearch = value > alpha && lmrDepth != newDepth;
             }
             else
@@ -540,14 +588,29 @@ namespace Storm
 
             if (fullDepthSearch)
             {
+#if !STORM_USE_UNDO
                 value = -SearchPosition<NonPV>((stack + 1)->Position, stack + 1, newDepth, -(alpha + 1), -alpha, selDepth, !cutNode);
+#else
+                value = -SearchPosition<NonPV>(position, stack + 1, newDepth, -(alpha + 1), -alpha, selDepth, !cutNode);
+                STORM_ASSERT(position.Hash.Hash == postHash, "Invalid");
+#endif
             }
             if (IsPvNode && (moveIndex == FirstMoveIndex || (value > alpha && (IsRoot || value < beta))))
             {
                 pv[0] = MOVE_NONE;
                 (stack + 1)->PV = pv;
+#if !STORM_USE_UNDO
                 value = -SearchPosition<PV>((stack + 1)->Position, stack + 1, newDepth, -beta, -alpha, selDepth, false);
+#else
+                value = -SearchPosition<PV>(position, stack + 1, newDepth, -beta, -alpha, selDepth, false);
+                STORM_ASSERT(position.Hash.Hash == postHash, "Invalid");
+#endif
             }
+
+#if STORM_USE_UNDO
+            position.UndoMove(move, undo);
+            STORM_ASSERT(position.Hash.Hash == preHash, "Invalid {} {}", GetFENFromPosition(position), UCI::FormatMove(move));
+#endif
 
             if (CheckLimits())
             {
@@ -689,14 +752,21 @@ namespace Storm
 
             moveIndex++;
             bool givesCheck = position.GivesCheck(move);
+#if !STORM_USE_UNDO
             Position movedPosition = position;
             movedPosition.ApplyMove(move, &undo, givesCheck);
             m_Nodes++;
-
             stack->CurrentMove = move;
-
             pv[0] = MOVE_NONE;
             ValueType value = -QuiescenceSearch<NT>(movedPosition, stack + 1, 0, -beta, -alpha, cutNode);
+#else
+            position.ApplyMove(move, &undo, givesCheck);
+            m_Nodes++;
+            stack->CurrentMove = move;
+            pv[0] = MOVE_NONE;
+            ValueType value = -QuiescenceSearch<NT>(position, stack + 1, 0, -beta, -alpha, cutNode);
+            position.UndoMove(move, undo);
+#endif
 
             if (CheckLimits())
             {

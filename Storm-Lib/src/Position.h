@@ -12,6 +12,13 @@ namespace Storm
 	{
 	public:
 		SquareIndex EnpassantSquare;
+		Piece CapturedPiece;
+		int HalfTurnsSinceCaptureOrPush;
+		bool CastlingRights[4];
+		BitBoard CheckedBy;
+		BitBoard BlockersForKing[COLOR_MAX];
+		BitBoard Pinners[COLOR_MAX];
+		BitBoard CheckSquares[PIECE_COUNT];
 	};
 
 	class STORM_API Position
@@ -95,7 +102,7 @@ namespace Storm
 		bool GivesCheck(Move move) const;
 		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);
 		void ApplyMove(Move move, UndoInfo* undo);
-		void UndoMove(const UndoInfo& undo);
+		void UndoMove(Move move, const UndoInfo& undo);
 		void ApplyNullMove(UndoInfo* undo);
 		void UndoNullMove(const UndoInfo& undo);
 		bool IsPseudoLegal(Move move) const;
