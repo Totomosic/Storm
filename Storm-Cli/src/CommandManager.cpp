@@ -338,6 +338,7 @@ namespace Storm
 	{
 		EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
 		std::cout << FormatEvaluation(evaluation) << std::endl;
+		std::cout << "NNUE evaluation: " << m_CurrentPosition.Evaluate() << std::endl;
 	}
 
 	void CommandManager::Perft(int depth)
@@ -352,6 +353,7 @@ namespace Storm
 	{
 		if (args.size() > 0)
 		{
+			m_CurrentPosition.ResetNetwork();
 			SearchLimits limits;
 
 			size_t moveStartIndex = 0;

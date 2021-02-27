@@ -5,8 +5,21 @@
 #include "ZobristHash.h"
 #include "Move.h"
 
+#include "nnue/Network.h"
+
 namespace Storm
 {
+
+	// For NNUE
+	constexpr size_t Modifier(size_t index)
+	{
+		return index >= 384 ? index - 384 : index + 384;
+	}
+
+	constexpr int PieceToNNUEIndex(Piece piece, Color color)
+	{
+		return int(piece - PIECE_START + PIECE_COUNT * (1 - color));
+	}
 
 	struct UndoInfo
 	{
@@ -70,6 +83,10 @@ namespace Storm
 
 		PositionCache Cache;
 
+	private:
+		DeltaArray m_Delta;
+		Network m_Network;
+
 	public:
 		void Initialize();
 
@@ -113,12 +130,18 @@ namespace Storm
 
 		bool SeeGE(Move move, ValueType threshold = 0) const;
 
+		inline void ResetNetwork() { m_Network.RecalculateIncremental(GetInputLayer()); }
+		inline ValueType Evaluate() const { return m_Network.Evaluate(); }
+
 	private:
 		void MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to);
 		void AddPiece(Color color, Piece piece, SquareIndex square);
 		void RemovePiece(Color color, Piece piece, SquareIndex square);
 
 		void UpdateCheckInfo(Color color);
+
+		std::array<int16_t, INPUT_NEURONS> GetInputLayer() const;
+		DeltaArray& CalculateMoveDelta(Move move, Piece capturedPiece, bool isEnpassant);
 	};
 
 	Position CreateStartingPosition();

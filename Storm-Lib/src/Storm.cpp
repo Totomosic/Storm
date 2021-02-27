@@ -8,6 +8,7 @@ namespace Storm
 #ifndef EMSCRIPTEN
 		Logger::Init();
 #endif
+		Network::Init();
 		InitRays();
 		InitAttacks();
 		InitZobristHash();
