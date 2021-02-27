@@ -26,7 +26,7 @@ namespace Storm
     }
 
     Search::Search(size_t ttSize, bool log)
-        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Settings(), m_TimeManager(), m_Book(nullptr), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_PvIndex(0), m_StartSearchTime(),
+        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Settings(), m_TimeManager(), m_Book(nullptr), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_PvIndex(0),
         m_Stopped(false), m_ShouldStop(false), m_SearchTables(std::make_unique<SearchTables>())
     {
         ClearTable<Move, SQUARE_MAX, SQUARE_MAX>(m_SearchTables->CounterMoves, MOVE_NONE);
@@ -178,7 +178,7 @@ namespace Storm
                 mv.PreviousScore = mv.Score;
             for (int pvIndex = 0; pvIndex < multiPv; pvIndex++)
             {
-                m_StartSearchTime = std::chrono::high_resolution_clock::now();
+                m_TimeManager.StartNewDepth();
                 m_PvIndex = pvIndex;
                 m_Nodes = 0;
                 int selDepth = 0;
@@ -198,15 +198,16 @@ namespace Storm
                     int adjustedDepth = std::max(1, rootDepth - betaCutoffs);
                     ValueType value = SearchPosition<PV>(position, stackPtr, adjustedDepth, alpha, beta, selDepth, false);
 
+                    std::stable_sort(m_RootMoves.begin() + pvIndex, m_RootMoves.end());
+
                     if (CheckLimits())
                     {
                         m_Stopped = true;
                         break;
                     }
 
-                    std::stable_sort(m_RootMoves.begin() + pvIndex, m_RootMoves.end());
-
-                    delta += delta / 2;
+                    if (multiPv == 1 && (value <= alpha || value >= beta) && m_TimeManager.TotalElapsedMs() > 3000)
+                        std::cout << FormatPV(m_RootMoves[0], alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.ElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
 
                     if (value <= alpha && value != -VALUE_MATE)
                     {
@@ -221,6 +222,7 @@ namespace Storm
                     }
                     else
                         break;
+                    delta += delta / 2;
                 }
 
                 if (CheckLimits())
@@ -238,33 +240,7 @@ namespace Storm
                 {
                     if (m_Log)
                     {
-                        auto elapsed = std::chrono::high_resolution_clock::now() - m_StartSearchTime;
-                        std::cout << "info depth " << rootDepth << " seldepth " << rootMove.SelDepth << " score ";
-                        if (!IsMateScore(rootMove.Score))
-                        {
-                            std::cout << "cp " << rootMove.Score;
-                        }
-                        else
-                        {
-                            if (rootMove.Score > 0)
-                                std::cout << "mate " << (GetPliesFromMateScore(rootMove.Score) / 2 + 1);
-                            else
-                                std::cout << "mate " << -(GetPliesFromMateScore(rootMove.Score) / 2);
-                        }
-                        std::cout << " nodes " << m_Nodes;
-                        std::cout << " nps " << (size_t)(m_Nodes / (elapsed.count() / 1e9f));
-                        std::cout << " time " << (size_t)(elapsed.count() / 1e6f);
-                        std::cout << " multipv " << (pvIndex + 1);
-                        if (m_Limits.Only.size() == 1)
-                            std::cout << " bookmove";
-                        //if (hashFull >= 500)
-                        //    std::cout << " hashfull " << hashFull;
-                        std::cout << " pv";
-                        for (Move move : rootMove.Pv)
-                        {
-                            std::cout << " " << UCI::FormatMove(move);
-                        }
-                        std::cout << std::endl;
+                        std::cout << FormatPV(rootMove, alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.ElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
                     }
                     if (callback)
                     {
@@ -417,13 +393,14 @@ namespace Storm
             // Null move pruning
             if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
             {
-                Position movedPosition = position;
-                movedPosition.ApplyNullMove();
+                UndoInfo undo;
+                position.ApplyNullMove(&undo);
 
                 stack->CurrentMove = MOVE_NONE;
                 stack->MoveCount = FirstMoveIndex;
 
-                ValueType value = -SearchPosition<NonPV>(movedPosition, stack + 1, depth - GetNullMoveDepthReduction(depth, stack->StaticEvaluation, beta), -beta, -beta + 1, selDepth, true);
+                ValueType value = -SearchPosition<NonPV>(position, stack + 1, depth - GetNullMoveDepthReduction(depth, stack->StaticEvaluation, beta), -beta, -beta + 1, selDepth, true);
+                position.UndoNullMove(undo);
                 if (value >= beta)
                     return IsMateScore(value) ? beta : value;
             }
@@ -471,6 +448,9 @@ namespace Storm
 
             if (move == stack->SkipMove)
                 continue;
+
+            if (IsRoot && m_TimeManager.TotalElapsedMs() > 3000)
+                std::cout << "info depth " << depth << " currmove " << UCI::FormatMove(move) << " currmovenumber " << moveIndex + 1 << std::endl;
 
             const bool givesCheck = position.GivesCheck(move);
             const bool isCapture = position.IsCapture(move);

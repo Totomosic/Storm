@@ -14,4 +14,9 @@ namespace Storm
 		m_AllocatedTime = size_t(m_Milliseconds);
 	}
 
+	void TimeManager::StartNewDepth()
+	{
+		m_DepthStartTime = std::chrono::high_resolution_clock::now();
+	}
+
 }

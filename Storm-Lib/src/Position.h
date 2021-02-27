@@ -95,7 +95,9 @@ namespace Storm
 		bool GivesCheck(Move move) const;
 		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);
 		void ApplyMove(Move move, UndoInfo* undo);
-		void ApplyNullMove();
+		void UndoMove(const UndoInfo& undo);
+		void ApplyNullMove(UndoInfo* undo);
+		void UndoNullMove(const UndoInfo& undo);
 		bool IsPseudoLegal(Move move) const;
 		bool IsLegal(Move move) const;
 		BitBoard GetSliderBlockers(BitBoard sliders, SquareIndex toSquare, BitBoard* pinners) const;

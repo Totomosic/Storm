@@ -5,8 +5,6 @@
 namespace Storm
 {
 
-	constexpr int MAX_PLY = 100;
-
 	constexpr int AspirationWindowDepth = 4;
 	constexpr ValueType InitialAspirationWindow = 15;
 

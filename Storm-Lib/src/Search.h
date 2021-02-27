@@ -17,6 +17,39 @@ namespace Storm
 
 	void InitSearch();
 
+	inline std::string FormatPV(const RootMove& move, ValueType alpha, ValueType beta, int depth, int multiPv, size_t nodes, size_t elapsedMilliseconds, bool isBookmove)
+	{
+		std::stringstream ss;
+		ss << "info depth " << depth << " seldepth " << move.SelDepth << " score ";
+		if (!IsMateScore(move.Score))
+			ss << "cp " << move.Score;
+		else
+		{
+			if (move.Score > 0)
+				ss << "mate " << (GetPliesFromMateScore(move.Score) / 2 + 1);
+			else
+				ss << "mate " << -(GetPliesFromMateScore(move.Score) / 2);
+		}
+		if (move.Score <= alpha)
+			ss << " upperbound";
+		else if (move.Score >= beta)
+			ss << " lowerbound";
+		ss << " nodes " << nodes;
+		ss << " nps " << (size_t)(nodes * 1000 / (elapsedMilliseconds + 1));
+		ss << " time " << elapsedMilliseconds;
+		ss << " multipv " << (multiPv + 1);
+		if (isBookmove)
+			std::cout << " bookmove";
+		//if (hashFull >= 500)
+		//    std::cout << " hashfull " << hashFull;
+		ss << " pv";
+		for (Move move : move.Pv)
+		{
+			ss << " " << UCI::FormatMove(move);
+		}
+		return ss.str();
+	}
+
 	struct STORM_API BestMove
 	{
 	public:
@@ -64,7 +97,6 @@ namespace Storm
 		size_t m_Nodes;
 		int m_PvIndex;
 
-		std::chrono::time_point<std::chrono::high_resolution_clock> m_StartSearchTime;
 		bool m_Stopped;
 		std::atomic<bool> m_ShouldStop;
 
@@ -99,8 +131,6 @@ namespace Storm
 		void UpdateQuietStats(SearchStack* stack, Move move);
 
 		bool IsDraw(const Position& position, SearchStack* stack) const;
-		constexpr ValueType MateIn(int ply) const { return VALUE_MATE - ply; }
-		constexpr ValueType MatedIn(int ply) const { return -VALUE_MATE + ply; }
 
 		constexpr ValueType GetValueForTT(ValueType value, int ply) const {
 			return IsMateScore(value) ? (value < 0 ? value - ply : value + ply) : value;
@@ -111,8 +141,6 @@ namespace Storm
 			return IsMateScore(value) ? (value < 0 ? value + ply : value - ply) : value;
 		}
 
-		constexpr int GetPliesFromMateScore(ValueType score) const { return score < 0 ? score + VALUE_MATE : VALUE_MATE - score; }
-		constexpr bool IsMateScore(ValueType score) const { return score >= MateIn(MAX_PLY) || score <= MatedIn(MAX_PLY); }
 		bool CheckLimits() const;
 		std::vector<RootMove> GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const;
 		int SelectBestMoveIndex(int multipv, int skillLevel) const;
