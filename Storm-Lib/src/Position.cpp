@@ -54,6 +54,8 @@ namespace Storm
 		UpdateCheckInfo(COLOR_BLACK);
 
 		Hash.SetFromPosition(*this);
+
+		m_Network.RecalculateIncremental(GetInputLayer());
 	}
 
 	void Position::ApplyMove(Move move, UndoInfo* undo)
@@ -217,6 +219,8 @@ namespace Storm
 
 		ColorToMove = otherColor;
 		Hash.FlipTeamToPlay();
+
+		m_Network.ApplyDelta(CalculateMoveDelta(move, capturedPiece, isEnpassant));
 	}
 
 	void Position::UndoMove(Move move, const UndoInfo& undo)
@@ -302,6 +306,8 @@ namespace Storm
 
 		ColorToMove = movingColor;
 		Hash.FlipTeamToPlay();
+
+		m_Network.ApplyInverseDelta();
 	}
 
 	void Position::ApplyNullMove(UndoInfo* undo)
@@ -671,6 +677,92 @@ namespace Storm
 		Cache.CheckSquares[color][PIECE_ROOK - PIECE_START] = GetAttacks<PIECE_ROOK>(kingSquare, GetPieces());
 		Cache.CheckSquares[color][PIECE_QUEEN - PIECE_START] = Cache.CheckSquares[color][PIECE_BISHOP - PIECE_START] | Cache.CheckSquares[color][PIECE_ROOK - PIECE_START];
 		Cache.CheckSquares[color][PIECE_KING - PIECE_START] = ZERO_BB;
+	}
+
+	std::array<int16_t, INPUT_NEURONS> Position::GetInputLayer() const
+	{
+		std::array<int16_t, INPUT_NEURONS> result;
+		for (Color color : { COLOR_BLACK, COLOR_WHITE })
+		{
+			for (Piece p = PIECE_PAWN; p < PIECE_MAX; p++)
+			{
+				BitBoard bb = GetPieces(color, p);
+				for (SquareIndex sq = a1; sq < SQUARE_MAX; sq++)
+				{
+					int i = PieceToNNUEIndex(p, color);
+					result[Modifier(i * SQUARE_MAX + sq)] = ((bb & sq) != ZERO_BB);
+				}
+			}
+		}
+
+		return result;
+	}
+
+	DeltaArray& Position::CalculateMoveDelta(Move move, Piece capturedPiece, bool isEnpassant)
+	{
+		m_Delta.Size = 0;
+		const MoveType moveType = GetMoveType(move);
+		const SquareIndex fromSquare = GetFromSquare(move);
+		const SquareIndex toSquare = GetToSquare(move);
+
+		auto PieceOnSquare = [&, this](SquareIndex square)
+		{
+			ColorPiece piece = GetPieceOnSquare(square);
+			return PieceToNNUEIndex(TypeOf(piece), ColorOf(piece));
+		};
+
+		if (moveType != PROMOTION)
+		{
+			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(toSquare) * SQUARE_MAX + fromSquare);
+			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(toSquare) * SQUARE_MAX + toSquare);
+			m_Delta.Deltas[m_Delta.Size++].Delta = 1;
+		}
+
+		if (isEnpassant)
+		{
+			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(PIECE_PAWN, ColorToMove) * SQUARE_MAX + CreateSquare(FileOf(toSquare), RankOf(fromSquare)));
+			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+		}
+
+		if (capturedPiece != PIECE_NONE && !isEnpassant)
+		{
+			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(capturedPiece, ColorToMove) * SQUARE_MAX + toSquare);
+			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+		}
+
+		if (moveType == CASTLE)
+		{
+			const Rank fromRank = RankOf(fromSquare);
+			if (FileOf(toSquare) == FILE_G)
+			{
+				// Kingside
+				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_F, fromRank)) * SQUARE_MAX + CreateSquare(FILE_H, fromRank));
+				m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_F, fromRank)) * SQUARE_MAX + CreateSquare(FILE_F, fromRank));
+				m_Delta.Deltas[m_Delta.Size++].Delta = 1;
+			}
+			else
+			{
+				// Queenside
+				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_D, fromRank)) * SQUARE_MAX + CreateSquare(FILE_A, fromRank));
+				m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_D, fromRank)) * SQUARE_MAX + CreateSquare(FILE_D, fromRank));
+				m_Delta.Deltas[m_Delta.Size++].Delta = 1;
+			}
+		}
+
+		if (moveType == PROMOTION)
+		{
+			const Piece promotionPiece = GetPromotionPiece(move);
+			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(PIECE_PAWN, OtherColor(ColorToMove)) * SQUARE_MAX + fromSquare);
+			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+
+			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(promotionPiece, OtherColor(ColorToMove)) * SQUARE_MAX + toSquare);
+			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+		}
+
+		return m_Delta;
 	}
 
     void ClearPosition(Position& position)

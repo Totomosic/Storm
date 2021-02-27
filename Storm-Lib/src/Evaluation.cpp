@@ -407,6 +407,7 @@ namespace Storm
 
 	ValueType Evaluate(const Position& position)
 	{
+		return position.Evaluate() * (position.ColorToMove == COLOR_WHITE ? 1 : -1);
 		return EvaluateDetailed(position).Result(position.ColorToMove);
 	}
 
