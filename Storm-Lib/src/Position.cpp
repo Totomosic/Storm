@@ -55,7 +55,9 @@ namespace Storm
 
 		Hash.SetFromPosition(*this);
 
-		m_Network.RecalculateIncremental(GetInputLayer());
+		m_Network = std::make_shared<Network>();
+		if (IsNetworkEnabled())
+			m_Network->RecalculateIncremental(GetInputLayer());
 	}
 
 	void Position::ApplyMove(Move move, UndoInfo* undo)
@@ -83,6 +85,8 @@ namespace Storm
 		const Rank otherBackRank = otherColor == COLOR_WHITE ? RANK_1 : RANK_8;
 		const Rank castleRank = ColorToMove == COLOR_WHITE ? RANK_1 : RANK_8;
 
+		m_Delta.Size = 0;
+
 		undo->EnpassantSquare = EnpassantSquare;
 		undo->CapturedPiece = capturedPiece;
 		undo->HalfTurnsSinceCaptureOrPush = HalfTurnsSinceCaptureOrPush;
@@ -106,8 +110,12 @@ namespace Storm
 		{
 			const Piece promotionPiece = GetPromotionPiece(move);
 			RemovePiece(otherColor, capturedPiece, toSquare);
+			RemoveDelta(otherColor, capturedPiece, toSquare);
 			RemovePiece(ColorToMove, movingPiece, fromSquare);
+			RemoveDelta(ColorToMove, movingPiece, fromSquare);
 			AddPiece(ColorToMove, promotionPiece, toSquare);
+			AddDelta(ColorToMove, promotionPiece, toSquare);
+			
 			if (capturedPiece == PIECE_ROOK && toRank == otherBackRank)
 			{
 				if (toFile == FILE_A && Colors[otherColor].CastleQueenSide)
@@ -125,7 +133,9 @@ namespace Storm
 		else if (isCapture)
 		{
 			RemovePiece(otherColor, capturedPiece, toSquare);
+			RemoveDelta(otherColor, capturedPiece, toSquare);
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
+			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 			if (capturedPiece == PIECE_ROOK && toRank == otherBackRank)
 			{
 				if (toFile == FILE_A && Colors[otherColor].CastleQueenSide)
@@ -144,36 +154,46 @@ namespace Storm
 		{
 			const Piece promotionPiece = GetPromotionPiece(move);
 			RemovePiece(ColorToMove, movingPiece, fromSquare);
+			RemoveDelta(ColorToMove, movingPiece, fromSquare);
 			AddPiece(ColorToMove, promotionPiece, toSquare);
+			AddDelta(ColorToMove, promotionPiece, toSquare);
 		}
 		else if (movingPiece == PIECE_PAWN && abs(toRank - fromRank) == 2)
 		{
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
+			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 			EnpassantSquare = GetEnpassantSquare(toSquare, ColorToMove);
 			Hash.AddEnPassant(FileOf(EnpassantSquare));
 		}
 		else if (isEnpassant)
 		{
-			RemovePiece(otherColor, PIECE_PAWN, GetEnpassantSquare(toSquare, ColorToMove));
+			const SquareIndex enpassantSquare = GetEnpassantSquare(toSquare, ColorToMove);
+			RemovePiece(otherColor, PIECE_PAWN, enpassantSquare);
+			RemoveDelta(otherColor, PIECE_PAWN, enpassantSquare);
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
+			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 		}
 		else if (isCastle)
 		{
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
+			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 			if (toFile == FILE_G)
 			{
 				// Kingside castle
 				MovePiece(ColorToMove, PIECE_ROOK, CreateSquare(FILE_H, toRank), CreateSquare(FILE_F, toRank));
+				MoveDelta(ColorToMove, PIECE_ROOK, CreateSquare(FILE_H, toRank), CreateSquare(FILE_F, toRank));
 			}
 			else
 			{
 				// Queenside castle
 				MovePiece(ColorToMove, PIECE_ROOK, CreateSquare(FILE_A, toRank), CreateSquare(FILE_D, toRank));
+				MoveDelta(ColorToMove, PIECE_ROOK, CreateSquare(FILE_A, toRank), CreateSquare(FILE_D, toRank));
 			}
 		}
 		else
 		{
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
+			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 		}
 
 		if (movingPiece == PIECE_KING)
@@ -220,7 +240,8 @@ namespace Storm
 		ColorToMove = otherColor;
 		Hash.FlipTeamToPlay();
 
-		m_Network.ApplyDelta(CalculateMoveDelta(move, capturedPiece, isEnpassant));
+		if (IsNetworkEnabled())
+			m_Network->ApplyDelta(m_Delta);
 	}
 
 	void Position::UndoMove(Move move, const UndoInfo& undo)
@@ -307,7 +328,8 @@ namespace Storm
 		ColorToMove = movingColor;
 		Hash.FlipTeamToPlay();
 
-		m_Network.ApplyInverseDelta();
+		if (IsNetworkEnabled())
+			m_Network->ApplyInverseDelta();
 	}
 
 	void Position::ApplyNullMove(UndoInfo* undo)
@@ -682,87 +704,18 @@ namespace Storm
 	std::array<int16_t, INPUT_NEURONS> Position::GetInputLayer() const
 	{
 		std::array<int16_t, INPUT_NEURONS> result;
-		for (Color color : { COLOR_BLACK, COLOR_WHITE })
+		for (Color color : { COLOR_WHITE, COLOR_BLACK })
 		{
 			for (Piece p = PIECE_PAWN; p < PIECE_MAX; p++)
 			{
 				BitBoard bb = GetPieces(color, p);
 				for (SquareIndex sq = a1; sq < SQUARE_MAX; sq++)
 				{
-					int i = PieceToNNUEIndex(p, color);
-					result[Modifier(i * SQUARE_MAX + sq)] = ((bb & sq) != ZERO_BB);
+					result[size_t(p - PIECE_START + PIECE_COUNT * color) * SQUARE_MAX + sq] = ((bb & sq) != ZERO_BB);
 				}
 			}
 		}
-
 		return result;
-	}
-
-	DeltaArray& Position::CalculateMoveDelta(Move move, Piece capturedPiece, bool isEnpassant)
-	{
-		m_Delta.Size = 0;
-		const MoveType moveType = GetMoveType(move);
-		const SquareIndex fromSquare = GetFromSquare(move);
-		const SquareIndex toSquare = GetToSquare(move);
-
-		auto PieceOnSquare = [&, this](SquareIndex square)
-		{
-			ColorPiece piece = GetPieceOnSquare(square);
-			return PieceToNNUEIndex(TypeOf(piece), ColorOf(piece));
-		};
-
-		if (moveType != PROMOTION)
-		{
-			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(toSquare) * SQUARE_MAX + fromSquare);
-			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(toSquare) * SQUARE_MAX + toSquare);
-			m_Delta.Deltas[m_Delta.Size++].Delta = 1;
-		}
-
-		if (isEnpassant)
-		{
-			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(PIECE_PAWN, ColorToMove) * SQUARE_MAX + CreateSquare(FileOf(toSquare), RankOf(fromSquare)));
-			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-		}
-
-		if (capturedPiece != PIECE_NONE && !isEnpassant)
-		{
-			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(capturedPiece, ColorToMove) * SQUARE_MAX + toSquare);
-			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-		}
-
-		if (moveType == CASTLE)
-		{
-			const Rank fromRank = RankOf(fromSquare);
-			if (FileOf(toSquare) == FILE_G)
-			{
-				// Kingside
-				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_F, fromRank)) * SQUARE_MAX + CreateSquare(FILE_H, fromRank));
-				m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_F, fromRank)) * SQUARE_MAX + CreateSquare(FILE_F, fromRank));
-				m_Delta.Deltas[m_Delta.Size++].Delta = 1;
-			}
-			else
-			{
-				// Queenside
-				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_D, fromRank)) * SQUARE_MAX + CreateSquare(FILE_A, fromRank));
-				m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-				m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceOnSquare(CreateSquare(FILE_D, fromRank)) * SQUARE_MAX + CreateSquare(FILE_D, fromRank));
-				m_Delta.Deltas[m_Delta.Size++].Delta = 1;
-			}
-		}
-
-		if (moveType == PROMOTION)
-		{
-			const Piece promotionPiece = GetPromotionPiece(move);
-			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(PIECE_PAWN, OtherColor(ColorToMove)) * SQUARE_MAX + fromSquare);
-			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-
-			m_Delta.Deltas[m_Delta.Size].Index = Modifier(PieceToNNUEIndex(promotionPiece, OtherColor(ColorToMove)) * SQUARE_MAX + toSquare);
-			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-		}
-
-		return m_Delta;
 	}
 
     void ClearPosition(Position& position)

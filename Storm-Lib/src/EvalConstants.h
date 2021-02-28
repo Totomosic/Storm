@@ -56,7 +56,7 @@ namespace Storm
 
 	constexpr int GameStageMax = 16 * PawnStageWeight + 4 * KnightStageWeight + 4 * BishopStageWeight + 4 * RookStageWeight + 2 * QueenStageWeight + 2 * KingStageWeight;
 
-	constexpr ValueType VALUE_MATE = 30000;
+	constexpr ValueType VALUE_MATE = 20000;
 	constexpr ValueType VALUE_NONE = -VALUE_MATE - 100;
 	constexpr ValueType VALUE_DRAW = 0;
 

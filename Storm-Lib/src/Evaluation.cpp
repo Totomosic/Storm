@@ -405,9 +405,17 @@ namespace Storm
 		return result;
 	}
 
+	ValueType EvaluateNNUE(const Position& position)
+	{
+		ValueType whiteSideRaw = position.Evaluate();
+		ValueType eval = whiteSideRaw * 94 / 100;
+		return (position.ColorToMove == COLOR_WHITE ? eval : -eval) + Tempo;
+	}
+
 	ValueType Evaluate(const Position& position)
 	{
-		return position.Evaluate() * (position.ColorToMove == COLOR_WHITE ? 1 : -1);
+		if (position.IsNetworkEnabled())
+			return EvaluateNNUE(position);
 		return EvaluateDetailed(position).Result(position.ColorToMove);
 	}
 

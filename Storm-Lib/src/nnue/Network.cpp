@@ -1,7 +1,6 @@
 #include "Network.h"
 #include "Epoch250.net"
-
-#include <iostream>
+#include <cmath>
 
 namespace Storm
 {
@@ -40,17 +39,18 @@ namespace Storm
     void Network::ApplyDelta(const DeltaArray& delta)
     {
         m_Zeta.push_back(m_Zeta.back());
+        auto& current = m_Zeta.back();
         for (size_t i = 0; i < delta.Size; i++)
         {
             if (delta.Deltas[i].Delta == 1)
             {
                 for (size_t j = 0; j < HIDDEN_NEURONS; j++)
-                    m_Zeta.back()[j] += s_HiddenWeights[delta.Deltas[i].Index][j];
+                    current[j] += s_HiddenWeights[delta.Deltas[i].Index][j];
             }
             else
             {
                 for (size_t j = 0; j < HIDDEN_NEURONS; j++)
-                    m_Zeta.back()[j] -= s_HiddenWeights[delta.Deltas[i].Index][j];
+                    current[j] -= s_HiddenWeights[delta.Deltas[i].Index][j];
             }
         }
     }

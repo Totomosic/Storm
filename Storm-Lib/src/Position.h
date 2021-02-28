@@ -10,17 +10,6 @@
 namespace Storm
 {
 
-	// For NNUE
-	constexpr size_t Modifier(size_t index)
-	{
-		return index >= 384 ? index - 384 : index + 384;
-	}
-
-	constexpr int PieceToNNUEIndex(Piece piece, Color color)
-	{
-		return int(piece - PIECE_START + PIECE_COUNT * (1 - color));
-	}
-
 	struct UndoInfo
 	{
 	public:
@@ -84,11 +73,19 @@ namespace Storm
 		PositionCache Cache;
 
 	private:
+		bool m_UseNetwork = true;
 		DeltaArray m_Delta;
-		Network m_Network;
+		std::shared_ptr<Network> m_Network;
 
 	public:
 		void Initialize();
+
+		inline void SetNetworkEnabled(bool enabled)
+		{
+			m_UseNetwork = enabled;
+			if (m_UseNetwork && IsNetworkAvailable())
+				m_Network->RecalculateIncremental(GetInputLayer());
+		}
 
 		inline BitBoard GetPieces() const { return Cache.AllPieces; }
 		inline BitBoard GetPieces(Piece p0) const { return GetPieces(COLOR_WHITE, p0) | GetPieces(COLOR_BLACK, p0); }
@@ -130,8 +127,10 @@ namespace Storm
 
 		bool SeeGE(Move move, ValueType threshold = 0) const;
 
-		inline void ResetNetwork() { m_Network.RecalculateIncremental(GetInputLayer()); }
-		inline ValueType Evaluate() const { return m_Network.Evaluate(); }
+		inline bool IsNetworkAvailable() const { return m_Network != nullptr; }
+		inline bool IsNetworkEnabled() const { return m_UseNetwork && IsNetworkAvailable(); }
+		inline void ResetNetwork() { if (IsNetworkEnabled()) m_Network->RecalculateIncremental(GetInputLayer()); }
+		inline ValueType Evaluate() const { return m_Network->Evaluate(); }
 
 	private:
 		void MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to);
@@ -141,7 +140,26 @@ namespace Storm
 		void UpdateCheckInfo(Color color);
 
 		std::array<int16_t, INPUT_NEURONS> GetInputLayer() const;
-		DeltaArray& CalculateMoveDelta(Move move, Piece capturedPiece, bool isEnpassant);
+
+		inline void AddDelta(Color color, Piece piece, SquareIndex square)
+		{
+			STORM_ASSERT(m_Delta.Size < sizeof(m_Delta.Deltas) / sizeof(m_Delta.Deltas[0]), "Too many deltas");
+			m_Delta.Deltas[m_Delta.Size].Index = size_t(piece - PIECE_START + PIECE_COUNT * color) * SQUARE_MAX + square;
+			m_Delta.Deltas[m_Delta.Size++].Delta = 1;
+		}
+
+		inline void RemoveDelta(Color color, Piece piece, SquareIndex square)
+		{
+			STORM_ASSERT(m_Delta.Size < sizeof(m_Delta.Deltas) / sizeof(m_Delta.Deltas[0]), "Too many deltas");
+			m_Delta.Deltas[m_Delta.Size].Index = size_t(piece - PIECE_START + PIECE_COUNT * color) * SQUARE_MAX + square;
+			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
+		}
+
+		inline void MoveDelta(Color color, Piece piece, SquareIndex from, SquareIndex to)
+		{
+			RemoveDelta(color, piece, from);
+			AddDelta(color, piece, to);
+		}
 	};
 
 	Position CreateStartingPosition();

@@ -6,6 +6,8 @@
 namespace Storm
 {
 
+	constexpr ValueType StaticEvalLimits = 3000;
+
 	STORM_API enum EntryBound : uint8_t
 	{
 		BOUND_LOWER = 1 << 0,
@@ -26,10 +28,11 @@ namespace Storm
 		inline Move GetMove() const { return m_Move; }
 		inline int GetDepth() const { return int(m_Depth); }
 		// Mask out 3 most signficant bits
-		inline ValueType GetValue() const { return int(m_ValueAndBound & 0x1FFFFFFF) + VALUE_NONE; }
+		inline ValueType GetValue() const { return int((m_ValueAndBound >> 13) & 0xFFFF) + VALUE_NONE; }
+		inline ValueType GetStaticEvaluation() const { return int(m_ValueAndBound & 0x1FFF) - StaticEvalLimits; }
 		inline EntryBound GetBound() const { return EntryBound(m_ValueAndBound >> 29); }
 
-		inline void Update(ZobristHash hash, Move move, int depth, EntryBound bound, ValueType value)
+		inline void Update(ZobristHash hash, Move move, int depth, EntryBound bound, ValueType value, ValueType staticEval)
 		{
 			STORM_ASSERT(value >= VALUE_NONE, "Invalid Value");
 			if (move != MOVE_NONE || hash != m_Hash)
@@ -38,7 +41,7 @@ namespace Storm
 			{
 				m_Hash = hash;
 				m_Depth = depth;
-				m_ValueAndBound = (uint32_t(bound) << 29) | (uint32_t(value - VALUE_NONE) & 0x1FFFFFFF);
+				m_ValueAndBound = (uint32_t(bound) << 29) | ((uint32_t(value - VALUE_NONE) & 0xFFFF) << 13) | (uint32_t(std::clamp(staticEval, ValueType(-StaticEvalLimits), StaticEvalLimits) + StaticEvalLimits) & 0x1FFF);
 			}
 		}
 	};
