@@ -9,10 +9,17 @@ CLI_DIRECTORY = "../Storm-Cli/src"
 SOURCE_DIRECTORY = "../Storm-Lib/src"
 SOURCE_FILES = []
 
-for path in os.listdir(SOURCE_DIRECTORY):
-    name, ext = os.path.splitext(path)
-    if ext == ".cpp":
-        SOURCE_FILES.append(path)
+def find_source_files_in_directory(directory):
+    for path in os.listdir(directory):
+        full_path = os.path.join(directory, path)
+        if os.path.isdir(full_path):
+            find_source_files_in_directory(full_path)
+        else:
+            name, ext = os.path.splitext(path)
+            if ext == ".cpp":
+                SOURCE_FILES.append(os.path.join(directory, path))
+
+find_source_files_in_directory(SOURCE_DIRECTORY)
 
 if __name__ == "__main__":
     os.makedirs(WEB_DIRECTORY, exist_ok=True)
@@ -22,7 +29,7 @@ if __name__ == "__main__":
     command_line = command_line.format(normalize_path(os.path.join(WEB_DIRECTORY, "Storm.js")), normalize_path(SOURCE_DIRECTORY))
 
     for source_file in SOURCE_FILES:
-        command_line += " {}".format(normalize_path(os.path.join(SOURCE_DIRECTORY, source_file)))
+        command_line += " {}".format(normalize_path(source_file))
     command_line += " {}".format(normalize_path("Emscripten.cpp"))
 
     print(command_line)

@@ -204,8 +204,8 @@ namespace Storm
                 if (depth >= AspirationWindowDepth)
                 {
                     delta = InitialAspirationWindow;
-                    alpha = std::max(m_RootMoves[pvIndex].PreviousScore - delta, -VALUE_MATE);
-                    beta = std::min(m_RootMoves[pvIndex].PreviousScore + delta, VALUE_MATE);
+                    alpha = std::max<ValueType>(m_RootMoves[pvIndex].PreviousScore - delta, -VALUE_MATE);
+                    beta = std::min<ValueType>(m_RootMoves[pvIndex].PreviousScore + delta, VALUE_MATE);
                 }
 
                 int betaCutoffs = 0;
@@ -223,18 +223,18 @@ namespace Storm
                         break;
                     }
 
-                    if (multiPv == 1 && (value <= alpha || value >= beta) && m_TimeManager.TotalElapsedMs() > 3000)
+                    if (m_Log && multiPv == 1 && (value <= alpha || value >= beta) && m_TimeManager.TotalElapsedMs() > 3000)
                         std::cout << FormatPV(m_RootMoves[0], alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.ElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
 
                     if (value <= alpha && value != -VALUE_MATE)
                     {
                         beta = (alpha + beta) / 2;
-                        alpha = std::max(value - delta, -VALUE_MATE);
+                        alpha = std::max<ValueType>(value - delta, -VALUE_MATE);
                         betaCutoffs = 0;
                     }
                     else if (value >= beta && value != VALUE_MATE)
                     {
-                        beta = std::min(value + delta, VALUE_MATE);
+                        beta = std::min<ValueType>(value + delta, VALUE_MATE);
                         betaCutoffs++;
                     }
                     else
@@ -386,7 +386,10 @@ namespace Storm
         // Static evaluation
         if (!inCheck)
         {
-            stack->StaticEvaluation = Evaluate(position);
+            if (ttHit)
+                stack->StaticEvaluation = ttEntry->GetStaticEvaluation();
+            else
+                stack->StaticEvaluation = Evaluate(position);
         }
 
         const bool improving = !inCheck ? stack->StaticEvaluation >= (stack - 2)->StaticEvaluation : false;
@@ -483,7 +486,7 @@ namespace Storm
             if (move == stack->SkipMove)
                 continue;
 
-            if (IsRoot && m_TimeManager.TotalElapsedMs() > 3000)
+            if (m_Log && IsRoot && m_TimeManager.TotalElapsedMs() > 3000)
                 std::cout << "info depth " << depth << " currmove " << UCI::FormatMove(move) << " currmovenumber " << moveIndex + 1 << std::endl;
 
             const bool givesCheck = position.GivesCheck(move);
@@ -674,7 +677,7 @@ namespace Storm
         }
 
         if (!(IsRoot && m_PvIndex != 0))
-            ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
+            ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply), stack->StaticEvaluation);
 
         return bestValue;
     }
@@ -719,7 +722,10 @@ namespace Storm
 
         if (!inCheck)
         {
-            stack->StaticEvaluation = Evaluate(position);
+            if (ttHit)
+                stack->StaticEvaluation = ttEntry->GetStaticEvaluation();
+            else
+                stack->StaticEvaluation = Evaluate(position);
                 
             if (stack->StaticEvaluation >= beta)
                 return stack->StaticEvaluation;
@@ -793,7 +799,7 @@ namespace Storm
         if (inCheck && bestValue == -VALUE_MATE)
             return MatedIn(stack->Ply);
 
-        ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply));
+        ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply), stack->StaticEvaluation);
         return bestValue;
     }
 
@@ -876,7 +882,7 @@ namespace Storm
         engine.seed(time(nullptr));
 
         ValueType bestScore = m_RootMoves[0].Score;
-        ValueType delta = std::min(bestScore - m_RootMoves[size_t(multipv) - 1].Score, PawnValueEg);
+        ValueType delta = std::min<ValueType>(bestScore - m_RootMoves[size_t(multipv) - 1].Score, PawnValueEg);
         ValueType weakness = 120 - 2 * skillLevel;
         ValueType maxScore = -VALUE_MATE;
 
@@ -904,10 +910,10 @@ namespace Storm
             int colorIncrement = position.ColorToMove == COLOR_WHITE ? limits.WhiteIncrement : limits.BlackIncrement;
             int allocatedTime = 0;
 
-            if (limits.MovesToGo > 0)
-                allocatedTime = colorTime / (limits.MovesToGo + 1) * 3 / 2;
-            else if (colorIncrement > 0)
+            if (colorIncrement > 0)
                 allocatedTime = int(colorTime * (1 + position.TotalTurns / 40.0f) / 16 + colorIncrement);
+            if (limits.MovesToGo > 0)
+                allocatedTime = colorTime / (std::min(limits.MovesToGo, 100) + 1) * 3 / 2;
             else
                 allocatedTime = colorTime / 20;
 

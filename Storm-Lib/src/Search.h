@@ -40,8 +40,6 @@ namespace Storm
 		ss << " multipv " << (multiPv + 1);
 		if (isBookmove)
 			std::cout << " bookmove";
-		//if (hashFull >= 500)
-		//    std::cout << " hashfull " << hashFull;
 		ss << " pv";
 		for (Move move : move.Pv)
 		{

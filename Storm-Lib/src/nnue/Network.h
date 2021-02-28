@@ -1,11 +1,12 @@
 #pragma once
 #include "Types.h"
 #include <array>
+#include <vector>
 
 namespace Storm
 {
 
-	constexpr size_t INPUT_NEURONS = PIECE_COUNT * 2 * SQUARE_MAX;
+	constexpr size_t INPUT_NEURONS = COLOR_PIECE_COUNT * SQUARE_MAX;
 	constexpr size_t HIDDEN_NEURONS = 256;
 
 	constexpr int16_t MAX_VALUE = 128;

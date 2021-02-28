@@ -96,7 +96,7 @@ namespace Storm
 				Space[C][S];
 			if constexpr (S == ENDGAME)
 			{
-				eval += SignOf(eval) * std::max(Initiative, -std::abs(eval));
+				eval += SignOf(eval) * std::max<ValueType>(Initiative, -std::abs(eval));
 			}
 			return eval;
 		}

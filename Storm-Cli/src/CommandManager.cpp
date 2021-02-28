@@ -338,7 +338,7 @@ namespace Storm
 	{
 		EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
 		std::cout << FormatEvaluation(evaluation) << std::endl;
-		std::cout << "NNUE evaluation: " << m_CurrentPosition.Evaluate() << std::endl;
+		std::cout << "NNUE evaluation: " << m_CurrentPosition.Evaluate() << " (white side)" << std::endl;
 	}
 
 	void CommandManager::Perft(int depth)
