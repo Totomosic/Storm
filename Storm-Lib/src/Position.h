@@ -73,7 +73,7 @@ namespace Storm
 		PositionCache Cache;
 
 	private:
-		bool m_UseNetwork = true;
+		bool m_UseNetwork = false;
 		DeltaArray m_Delta;
 		std::shared_ptr<Network> m_Network;
 

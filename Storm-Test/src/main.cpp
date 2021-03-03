@@ -160,13 +160,14 @@ namespace Test
 		Position position = CreateStartingPosition();
 
 		TranspositionTableEntry tte;
-		tte.Update(position.Hash, MOVE_NONE, 10, BOUND_UPPER, 160);
+		tte.Update(position.Hash, MOVE_NONE, 10, BOUND_UPPER, 160, -50);
 
 		REQUIRE(tte.GetHash() == position.Hash);
 		REQUIRE(tte.GetMove() == MOVE_NONE);
 		REQUIRE(tte.GetDepth() == 10);
 		REQUIRE(tte.GetValue() == 160);
 		REQUIRE(tte.GetBound() == BOUND_UPPER);
+		REQUIRE(tte.GetStaticEvaluation() == -50);
 
 		bool found;
 		TranspositionTableEntry* entry = tt.GetEntry(position.Hash, found);
@@ -181,21 +182,23 @@ namespace Test
 		REQUIRE(newEntry->GetValue() == 160);
 		REQUIRE(newEntry->GetBound() == BOUND_UPPER);
 
-		tte.Update(position.Hash, MOVE_NONE, 0, BOUND_EXACT, -23);
+		tte.Update(position.Hash, MOVE_NONE, 0, BOUND_EXACT, -23, 10);
 		REQUIRE(tte.GetHash() == position.Hash);
 		REQUIRE(tte.GetMove() == MOVE_NONE);
 		REQUIRE(tte.GetDepth() == 0);
 		REQUIRE(tte.GetValue() == -23);
 		REQUIRE(tte.GetBound() == BOUND_EXACT);
+		REQUIRE(tte.GetStaticEvaluation() == 10);
 
 		Move move = CreateMove(e2, e4);
 
-		tte.Update(position.Hash, move, -5, BOUND_EXACT, VALUE_MATE - 10);
+		tte.Update(position.Hash, move, -5, BOUND_EXACT, VALUE_MATE - 10, -2000);
 		REQUIRE(tte.GetHash() == position.Hash);
 		REQUIRE(tte.GetMove() == move);
 		REQUIRE(tte.GetDepth() == -5);
 		REQUIRE(tte.GetValue() == VALUE_MATE - 10);
 		REQUIRE(tte.GetBound() == BOUND_EXACT);
+		REQUIRE(tte.GetStaticEvaluation() == -2000);
 	}
 
 	TEST_CASE("Checks", "[Check]")

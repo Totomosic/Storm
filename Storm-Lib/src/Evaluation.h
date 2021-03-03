@@ -148,6 +148,7 @@ namespace Storm
 	void InitEvaluation();
 
 	EvaluationResult EvaluateDetailed(const Position& position);
+	ValueType EvaluateNNUE(const Position& position);
 	ValueType Evaluate(const Position& position);
 
 	template<Color C>
