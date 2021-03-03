@@ -6,6 +6,7 @@ namespace Storm
 	CommandManager::CommandManager()
 		: m_CommandMap(), m_OpeningBook(), m_CurrentPosition(CreateStartingPosition()), m_Search(128 * 1024 * 1024), m_Searching(false), m_SearchThread(), m_UndoMove(MOVE_NONE), m_Undo()
 	{
+		m_CurrentPosition.SetNetworkEnabled(true);
 		m_CommandMap["help"] = [this](const std::vector<std::string>& args)
 		{
 			Help();
@@ -246,6 +247,7 @@ namespace Storm
 		{
 			// m_Search.Reset();
 			m_CurrentPosition = CreateStartingPosition();
+			m_CurrentPosition.SetNetworkEnabled(true);
 		}
 	}
 
@@ -290,6 +292,7 @@ namespace Storm
 		{
 			// m_Search.Reset();
 			m_CurrentPosition = CreatePositionFromFEN(fen);
+			m_CurrentPosition.SetNetworkEnabled(true);
 		}
 	}
 
@@ -338,7 +341,8 @@ namespace Storm
 	{
 		EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
 		std::cout << FormatEvaluation(evaluation) << std::endl;
-		std::cout << "NNUE evaluation: " << m_CurrentPosition.Evaluate() << " (white side)" << std::endl;
+		if (m_CurrentPosition.IsNetworkEnabled())
+			std::cout << "NNUE evaluation: " << EvaluateNNUE(m_CurrentPosition) * (m_CurrentPosition.ColorToMove == COLOR_WHITE ? 1 : -1) << " (white side)" << std::endl;
 	}
 
 	void CommandManager::Perft(int depth)

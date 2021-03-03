@@ -55,6 +55,10 @@ namespace Storm
         MoveList moveList(moves);
         moveList.FillLegal<ALL>(position);
 
+        const bool networkWasEnabled = position.IsNetworkEnabled();
+        if (networkWasEnabled)
+            position.SetNetworkEnabled(false);
+
         auto startTime = std::chrono::high_resolution_clock::now();
 
         for (Move move : moveList)
@@ -83,6 +87,10 @@ namespace Storm
             std::cout << "Total Nodes: " << total << std::endl;
             std::cout << "Nodes per Second: " << (size_t)(total / (double)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() * 1e9) << std::endl;
         }
+
+        if (networkWasEnabled)
+            position.SetNetworkEnabled(true);
+
         return total;
     }
 
@@ -191,8 +199,6 @@ namespace Storm
 
         while (rootDepth <= depth)
         {
-            for (RootMove& mv : m_RootMoves)
-                mv.PreviousScore = mv.Score;
             for (int pvIndex = 0; pvIndex < multiPv; pvIndex++)
             {
                 m_TimeManager.StartNewDepth();
@@ -247,6 +253,9 @@ namespace Storm
                     m_Stopped = true;
                     break;
                 }
+
+                for (RootMove& mv : m_RootMoves)
+                    mv.PreviousScore = mv.Score;
 
                 std::stable_sort(m_RootMoves.begin(), m_RootMoves.begin() + pvIndex + 1);
 

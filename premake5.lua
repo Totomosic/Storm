@@ -42,3 +42,6 @@ else
 end
 
 include ("Storm-Emscripten")
+
+group("Training")
+include ("Training/GenerateFens")
