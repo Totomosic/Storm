@@ -13,3 +13,4 @@ Boxfish_wrapper.cpp
 SwigConfigWindows.lua
 SwigConfigLinux.lua
 Build.bat
+__pycache__/
