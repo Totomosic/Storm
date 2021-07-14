@@ -10,6 +10,8 @@ namespace Storm
     std::array<int16_t, HIDDEN_NEURONS> Network::s_OutputWeights = {};
     int16_t Network::s_OutputBias = 0;
 
+    constexpr int16_t Multiplier = 1;
+
     template<typename T, size_t S>
     std::array<T, S> ReLU(const std::array<T, S>& src)
     {
@@ -64,7 +66,7 @@ namespace Storm
     {
         int32_t output = s_OutputBias * PRECISION;
         DotProduct(ReLU(m_Zeta.back()), s_OutputWeights, output);
-        return output / PRECISION_SQUARED;
+        return output * Multiplier / PRECISION_SQUARED;
     }
 
     void Network::Init()

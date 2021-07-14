@@ -45,10 +45,10 @@ namespace Storm
 		Searcher(const std::string& engineCommand, ThreadSafeFileWriter& writer, SharedData& sharedData, int64_t iterations, int depth, size_t seed);
 
 		inline void SetBestMoveChance(float chance) { m_BestMoveChance = chance; }
-		void Start(const Position& initialPosition);
+		void Start(const Position& initialPosition, bool onlyQuiet = true);
 
 	private:
-		SearchResult SearchPosition(Position& position, int ply);
+		SearchResult SearchPosition(Position& position, int ply, bool onlyQuiet);
 		float GetRandom() const;
 		Move PickRandom(std::vector<Move>& moves) const;
 		std::string GetComparableFen(const std::string& fen) const;

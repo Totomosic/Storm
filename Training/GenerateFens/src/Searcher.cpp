@@ -9,17 +9,17 @@ namespace Storm
         m_Random.seed(seed);
     }
 
-    void Searcher::Start(const Position& initialPosition)
+    void Searcher::Start(const Position& initialPosition, bool onlyQuiet)
     {
         Position position = initialPosition;
         while (m_Iterations > 0)
         {
-            SearchPosition(position, 0);
+            SearchPosition(position, 0, onlyQuiet);
         }
         FlushData();
     }
 
-    Searcher::SearchResult Searcher::SearchPosition(Position& position, int ply)
+    Searcher::SearchResult Searcher::SearchPosition(Position& position, int ply, bool onlyQuiet)
     {
         const bool IsRoot = ply == 0;
         SearchResult result;
@@ -50,7 +50,9 @@ namespace Storm
                     }
                     else if (std::abs(data.Score) <= m_EvalLimit)
                     {
-                        WriteData(fen, data);
+                        // Ensure that the position is quiet (not in check and no captures)
+                        if (!onlyQuiet || (!position.InCheck() && std::find_if(moves.begin(), moves.end(), [&position](const Move& move) { return position.IsCapture(move) && position.SeeGE(move); }) == moves.end()))
+                            WriteData(fen, data);
                         Move bestMove = UCI::CreateMoveFromString(position, data.BestMove);
                         Move move;
                         bool doneBestMove = false;
@@ -71,7 +73,7 @@ namespace Storm
                             }
                             UndoInfo undo;
                             position.ApplyMove(move, &undo);
-                            SearchResult searchResult = SearchPosition(position, ply + 1);
+                            SearchResult searchResult = SearchPosition(position, ply + 1, onlyQuiet);
                             position.UndoMove(move, undo);
 
                             if (!searchResult.Continue || m_Iterations <= 0)

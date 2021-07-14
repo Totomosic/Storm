@@ -1,5 +1,6 @@
 .vs/
 .vscode/
+venv/
 bin/
 bin-int/
 Web/
