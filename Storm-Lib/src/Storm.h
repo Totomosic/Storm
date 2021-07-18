@@ -12,6 +12,6 @@
 namespace Storm
 {
 
-	void Init();
+	void Init(const std::string& evalFilename = "nn-9e3c6298299a.nnue");
 
 }

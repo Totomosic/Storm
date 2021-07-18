@@ -54,18 +54,20 @@ namespace Storm
 		UpdateCheckInfo(COLOR_BLACK);
 
 		Hash.SetFromPosition(*this);
-
-		m_Network = std::make_shared<Network>();
-		if (IsNetworkEnabled())
-			m_Network->RecalculateIncremental(GetInputLayer());
 	}
 
-	void Position::ApplyMove(Move move, UndoInfo* undo)
+	void Position::Reset(StateInfo* st)
 	{
-		return ApplyMove(move, undo, GivesCheck(move));
+		m_StateInfo = st;
+		std::memset(m_StateInfo, 0, sizeof(StateInfo));
 	}
 
-	void Position::ApplyMove(Move move, UndoInfo* undo, bool givesCheck)
+	void Position::ApplyMove(Move move, StateInfo& st, UndoInfo* undo)
+	{
+		return ApplyMove(move, st, undo, GivesCheck(move));
+	}
+
+	void Position::ApplyMove(Move move, StateInfo& st, UndoInfo* undo, bool givesCheck)
 	{
 		STORM_ASSERT(ValidMove(move), "Invalid move");
 		const SquareIndex fromSquare = GetFromSquare(move);
@@ -85,7 +87,17 @@ namespace Storm
 		const Rank otherBackRank = otherColor == COLOR_WHITE ? RANK_1 : RANK_8;
 		const Rank castleRank = ColorToMove == COLOR_WHITE ? RANK_1 : RANK_8;
 
-		m_Delta.Size = 0;
+		st.Previous = m_StateInfo;
+		m_StateInfo = &st;
+		m_StateInfo->Accumulator.computed[COLOR_WHITE] = false;
+		m_StateInfo->Accumulator.computed[COLOR_BLACK] = false;
+
+		auto& dp = m_StateInfo->DirtyPiece;
+		dp.dirty_num = 1;
+
+		dp.piece[0] = CreatePiece(movingPiece, ColorToMove);
+		dp.from[0] = fromSquare;
+		dp.to[0] = toSquare;
 
 		undo->EnpassantSquare = EnpassantSquare;
 		undo->CapturedPiece = capturedPiece;
@@ -110,11 +122,8 @@ namespace Storm
 		{
 			const Piece promotionPiece = GetPromotionPiece(move);
 			RemovePiece(otherColor, capturedPiece, toSquare);
-			RemoveDelta(otherColor, capturedPiece, toSquare);
 			RemovePiece(ColorToMove, movingPiece, fromSquare);
-			RemoveDelta(ColorToMove, movingPiece, fromSquare);
 			AddPiece(ColorToMove, promotionPiece, toSquare);
-			AddDelta(ColorToMove, promotionPiece, toSquare);
 			
 			if (capturedPiece == PIECE_ROOK && toRank == otherBackRank)
 			{
@@ -129,13 +138,21 @@ namespace Storm
 					Hash.RemoveCastleKingside(otherColor);
 				}
 			}
+			dp.dirty_num = 2;
+			dp.piece[1] = CreatePiece(capturedPiece, otherColor);
+			dp.from[1] = toSquare;
+			dp.to[1] = SQUARE_INVALID;
+
+			dp.to[0] = SQUARE_INVALID;
+			dp.piece[dp.dirty_num] = CreatePiece(promotionPiece, ColorToMove);
+			dp.from[dp.dirty_num] = SQUARE_INVALID;
+			dp.to[dp.dirty_num] = toSquare;
+			dp.dirty_num++;
 		}
 		else if (isCapture)
 		{
 			RemovePiece(otherColor, capturedPiece, toSquare);
-			RemoveDelta(otherColor, capturedPiece, toSquare);
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
-			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 			if (capturedPiece == PIECE_ROOK && toRank == otherBackRank)
 			{
 				if (toFile == FILE_A && Colors[otherColor].CastleQueenSide)
@@ -149,19 +166,26 @@ namespace Storm
 					Hash.RemoveCastleKingside(otherColor);
 				}
 			}
+			dp.dirty_num = 2;
+			dp.piece[1] = CreatePiece(capturedPiece, otherColor);
+			dp.from[1] = toSquare;
+			dp.to[1] = SQUARE_INVALID;
 		}
 		else if (isPromotion)
 		{
 			const Piece promotionPiece = GetPromotionPiece(move);
 			RemovePiece(ColorToMove, movingPiece, fromSquare);
-			RemoveDelta(ColorToMove, movingPiece, fromSquare);
 			AddPiece(ColorToMove, promotionPiece, toSquare);
-			AddDelta(ColorToMove, promotionPiece, toSquare);
+
+			dp.to[0] = SQUARE_INVALID;
+			dp.piece[dp.dirty_num] = CreatePiece(promotionPiece, ColorToMove);
+			dp.from[dp.dirty_num] = SQUARE_INVALID;
+			dp.to[dp.dirty_num] = toSquare;
+			dp.dirty_num++;
 		}
 		else if (movingPiece == PIECE_PAWN && abs(toRank - fromRank) == 2)
 		{
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
-			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 			EnpassantSquare = GetEnpassantSquare(toSquare, ColorToMove);
 			Hash.AddEnPassant(FileOf(EnpassantSquare));
 		}
@@ -169,31 +193,39 @@ namespace Storm
 		{
 			const SquareIndex enpassantSquare = GetEnpassantSquare(toSquare, ColorToMove);
 			RemovePiece(otherColor, PIECE_PAWN, enpassantSquare);
-			RemoveDelta(otherColor, PIECE_PAWN, enpassantSquare);
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
-			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
+
+			dp.dirty_num = 2;
+			dp.piece[1] = CreatePiece(PIECE_PAWN, otherColor);
+			dp.from[1] = enpassantSquare;
+			dp.to[1] = SQUARE_INVALID;
 		}
 		else if (isCastle)
 		{
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
-			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
+			dp.piece[0] = CreatePiece(PIECE_KING, ColorToMove);
+			dp.from[0] = fromSquare;
+			dp.to[0] = toSquare;
+			dp.piece[1] = CreatePiece(PIECE_ROOK, ColorToMove);
+			dp.dirty_num = 2;
 			if (toFile == FILE_G)
 			{
 				// Kingside castle
 				MovePiece(ColorToMove, PIECE_ROOK, CreateSquare(FILE_H, toRank), CreateSquare(FILE_F, toRank));
-				MoveDelta(ColorToMove, PIECE_ROOK, CreateSquare(FILE_H, toRank), CreateSquare(FILE_F, toRank));
+				dp.from[1] = CreateSquare(FILE_H, toRank);
+				dp.to[1] = CreateSquare(FILE_F, toRank);
 			}
 			else
 			{
 				// Queenside castle
 				MovePiece(ColorToMove, PIECE_ROOK, CreateSquare(FILE_A, toRank), CreateSquare(FILE_D, toRank));
-				MoveDelta(ColorToMove, PIECE_ROOK, CreateSquare(FILE_A, toRank), CreateSquare(FILE_D, toRank));
+				dp.from[1] = CreateSquare(FILE_A, toRank);
+				dp.to[1] = CreateSquare(FILE_D, toRank);
 			}
 		}
 		else
 		{
 			MovePiece(ColorToMove, movingPiece, fromSquare, toSquare);
-			MoveDelta(ColorToMove, movingPiece, fromSquare, toSquare);
 		}
 
 		if (movingPiece == PIECE_KING)
@@ -239,9 +271,6 @@ namespace Storm
 
 		ColorToMove = otherColor;
 		Hash.FlipTeamToPlay();
-
-		if (IsNetworkEnabled())
-			m_Network->ApplyDelta(m_Delta);
 	}
 
 	void Position::UndoMove(Move move, const UndoInfo& undo)
@@ -328,14 +357,20 @@ namespace Storm
 		ColorToMove = movingColor;
 		Hash.FlipTeamToPlay();
 
-		if (IsNetworkEnabled())
-			m_Network->ApplyInverseDelta();
+		m_StateInfo = m_StateInfo->Previous;
 	}
 
-	void Position::ApplyNullMove(UndoInfo* undo)
+	void Position::ApplyNullMove(StateInfo& st, UndoInfo* undo)
 	{
 		STORM_ASSERT(!GetCheckers(), "Cannot be in check");
 		const Color otherColor = OtherColor(ColorToMove);
+
+		st.Previous = m_StateInfo;
+		m_StateInfo = &st;
+		m_StateInfo->DirtyPiece.dirty_num = 0;
+		m_StateInfo->DirtyPiece.piece[0] = COLOR_PIECE_NONE;
+		m_StateInfo->Accumulator.computed[COLOR_WHITE] = false;
+		m_StateInfo->Accumulator.computed[COLOR_BLACK] = false;
 
 		// CheckedBy is guaranteed to be ZERO_BB so no need to save it
 		// Castling is not affected by null move so no need to save it
@@ -382,6 +417,8 @@ namespace Storm
 			TotalTurns--;
 		ColorToMove = OtherColor(ColorToMove);
 		Hash.FlipTeamToPlay();
+
+		m_StateInfo = m_StateInfo->Previous;
 	}
 
 	bool Position::IsPseudoLegal(Move move) const
@@ -699,23 +736,6 @@ namespace Storm
 		Cache.CheckSquares[color][PIECE_ROOK - PIECE_START] = GetAttacks<PIECE_ROOK>(kingSquare, GetPieces());
 		Cache.CheckSquares[color][PIECE_QUEEN - PIECE_START] = Cache.CheckSquares[color][PIECE_BISHOP - PIECE_START] | Cache.CheckSquares[color][PIECE_ROOK - PIECE_START];
 		Cache.CheckSquares[color][PIECE_KING - PIECE_START] = ZERO_BB;
-	}
-
-	std::array<int16_t, INPUT_NEURONS> Position::GetInputLayer() const
-	{
-		std::array<int16_t, INPUT_NEURONS> result;
-		for (Color color : { COLOR_WHITE, COLOR_BLACK })
-		{
-			for (Piece p = PIECE_PAWN; p < PIECE_MAX; p++)
-			{
-				BitBoard bb = GetPieces(color, p);
-				for (SquareIndex sq = a1; sq < SQUARE_MAX; sq++)
-				{
-					result[size_t(p - PIECE_START + PIECE_COUNT * color) * SQUARE_MAX + sq] = ((bb & sq) != ZERO_BB);
-				}
-			}
-		}
-		return result;
 	}
 
     void ClearPosition(Position& position)

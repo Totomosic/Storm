@@ -90,7 +90,8 @@ bool PositionCanQueensideCastle(const Position& position, Color color)
 
 void PositionApplyMove(Position& position, Move move, UndoInfo& undo)
 {
-	position.ApplyMove(move, &undo);
+	StateInfo st;
+	position.ApplyMove(move, st, &undo);
 }
 
 Position PositionClone(const Position& position)

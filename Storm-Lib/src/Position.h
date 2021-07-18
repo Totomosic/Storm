@@ -5,10 +5,35 @@
 #include "ZobristHash.h"
 #include "Move.h"
 
-#include "nnue/Network.h"
+#include "nnue/nnue_accumulator.h"
 
 namespace Storm
 {
+
+	// Keep track of what a move changes on the board (used by NNUE)
+	struct DirtyPiece
+	{
+	public:
+		// Number of changed pieces
+		int dirty_num;
+
+		// Max 3 pieces can change in one move. A promotion with capture moves
+		// both the pawn and the captured piece to SQ_NONE and the piece promoted
+		// to from SQ_NONE to the capture square.
+		ColorPiece piece[3];
+
+		// From and to squares, which may be SQ_NONE
+		SquareIndex from[3];
+		SquareIndex to[3];
+	};
+
+	struct StateInfo
+	{
+	public:
+		Storm::NNUE::Accumulator Accumulator;
+		Storm::DirtyPiece DirtyPiece;
+		StateInfo* Previous;
+	};
 
 	struct UndoInfo
 	{
@@ -74,8 +99,7 @@ namespace Storm
 
 	private:
 		bool m_UseNetwork = false;
-		DeltaArray m_Delta;
-		std::shared_ptr<Network> m_Network;
+		StateInfo* m_StateInfo;
 
 	public:
 		void Initialize();
@@ -83,9 +107,10 @@ namespace Storm
 		inline void SetNetworkEnabled(bool enabled)
 		{
 			m_UseNetwork = enabled;
-			if (m_UseNetwork && IsNetworkAvailable())
-				m_Network->RecalculateIncremental(GetInputLayer());
 		}
+
+		void Reset(StateInfo* st);
+		inline StateInfo* GetState() const { return m_StateInfo; }
 
 		inline BitBoard GetPieces() const { return Cache.AllPieces; }
 		inline BitBoard GetPieces(Piece p0) const { return GetPieces(COLOR_WHITE, p0) | GetPieces(COLOR_BLACK, p0); }
@@ -114,10 +139,10 @@ namespace Storm
 		inline bool IsEnpassant(Move move) const { return TypeOf(GetPieceOnSquare(GetFromSquare(move))) == PIECE_PAWN && GetToSquare(move) == EnpassantSquare; }
 
 		bool GivesCheck(Move move) const;
-		void ApplyMove(Move move, UndoInfo* undo, bool givesCheck);
-		void ApplyMove(Move move, UndoInfo* undo);
+		void ApplyMove(Move move, StateInfo& st, UndoInfo* undo, bool givesCheck);
+		void ApplyMove(Move move, StateInfo& st, UndoInfo* undo);
 		void UndoMove(Move move, const UndoInfo& undo);
-		void ApplyNullMove(UndoInfo* undo);
+		void ApplyNullMove(StateInfo& st, UndoInfo* undo);
 		void UndoNullMove(const UndoInfo& undo);
 		bool IsPseudoLegal(Move move) const;
 		bool IsLegal(Move move) const;
@@ -127,10 +152,8 @@ namespace Storm
 
 		bool SeeGE(Move move, ValueType threshold = 0) const;
 
-		inline bool IsNetworkAvailable() const { return m_Network != nullptr; }
+		inline bool IsNetworkAvailable() const { return true; }
 		inline bool IsNetworkEnabled() const { return m_UseNetwork && IsNetworkAvailable(); }
-		inline void ResetNetwork() { if (IsNetworkEnabled()) m_Network->RecalculateIncremental(GetInputLayer()); }
-		inline ValueType Evaluate() const { return m_Network->Evaluate(); }
 
 	private:
 		void MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to);
@@ -138,28 +161,6 @@ namespace Storm
 		void RemovePiece(Color color, Piece piece, SquareIndex square);
 
 		void UpdateCheckInfo(Color color);
-
-		std::array<int16_t, INPUT_NEURONS> GetInputLayer() const;
-
-		inline void AddDelta(Color color, Piece piece, SquareIndex square)
-		{
-			STORM_ASSERT(m_Delta.Size < sizeof(m_Delta.Deltas) / sizeof(m_Delta.Deltas[0]), "Too many deltas");
-			m_Delta.Deltas[m_Delta.Size].Index = size_t(piece - PIECE_START + PIECE_COUNT * color) * SQUARE_MAX + square;
-			m_Delta.Deltas[m_Delta.Size++].Delta = 1;
-		}
-
-		inline void RemoveDelta(Color color, Piece piece, SquareIndex square)
-		{
-			STORM_ASSERT(m_Delta.Size < sizeof(m_Delta.Deltas) / sizeof(m_Delta.Deltas[0]), "Too many deltas");
-			m_Delta.Deltas[m_Delta.Size].Index = size_t(piece - PIECE_START + PIECE_COUNT * color) * SQUARE_MAX + square;
-			m_Delta.Deltas[m_Delta.Size++].Delta = -1;
-		}
-
-		inline void MoveDelta(Color color, Piece piece, SquareIndex from, SquareIndex to)
-		{
-			RemoveDelta(color, piece, from);
-			AddDelta(color, piece, to);
-		}
 	};
 
 	Position CreateStartingPosition();

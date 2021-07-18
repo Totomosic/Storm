@@ -15,6 +15,7 @@ namespace Storm
 
 		OpeningBook m_OpeningBook;
 
+		StateInfo m_StateInfo;
 		Position m_CurrentPosition;
 		Search m_Search;
 		SearchSettings m_Settings;

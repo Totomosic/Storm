@@ -5,6 +5,11 @@
 namespace Storm
 {
 
+	namespace NNUE
+	{
+		ValueType EvaluateNNUE(const Position& position, bool adjusted);
+	}
+
 	// =======================================================================================================================================================================================
 	// UTILS
 	// =======================================================================================================================================================================================
@@ -145,10 +150,9 @@ namespace Storm
 		}
 	};
 
-	void InitEvaluation();
+	void InitEvaluation(const std::string& evalFilename);
 
 	EvaluationResult EvaluateDetailed(const Position& position);
-	ValueType EvaluateNNUE(const Position& position);
 	ValueType Evaluate(const Position& position);
 
 	template<Color C>

@@ -137,24 +137,24 @@ namespace Storm
 	enum ColorPiece : uint8_t
 	{
 		COLOR_PIECE_NONE = 0b0000,
-		WHITE_PAWN = 0b0010, WHITE_KNIGHT = 0b0100, WHITE_BISHOP = 0b0110, WHITE_ROOK = 0b1000, WHITE_QUEEN = 0b1010, WHITE_KING = 0b1100,
-		BLACK_PAWN = 0b0011, BLACK_KNIGHT = 0b0101, BLACK_BISHOP = 0b0111, BLACK_ROOK = 0b1001, BLACK_QUEEN = 0b1011, BLACK_KING = 0b1101,
+		WHITE_PAWN = PIECE_PAWN, WHITE_KNIGHT, WHITE_BISHOP, WHITE_ROOK, WHITE_QUEEN, WHITE_KING,
+		BLACK_PAWN = PIECE_PAWN + 8, BLACK_KNIGHT, BLACK_BISHOP, BLACK_ROOK, BLACK_QUEEN, BLACK_KING,
 		COLOR_PIECE_COUNT = 12,
 	};
 
 	constexpr ColorPiece CreatePiece(Piece type, Color color)
 	{
-		return ColorPiece(((type) << 1) | (color & 0x1));
+		return ColorPiece(type + color * 8);
 	}
 
 	constexpr Piece TypeOf(ColorPiece piece)
 	{
-		return Piece(piece >> 1);
+		return Piece(piece > 8 ? piece - 8 : piece);
 	}
 
 	constexpr Color ColorOf(ColorPiece piece)
 	{
-		return Color(piece & 0x1);
+		return Color(piece > 8);
 	}
 
 	enum Direction : int8_t

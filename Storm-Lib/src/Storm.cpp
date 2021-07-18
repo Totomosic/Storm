@@ -3,16 +3,15 @@
 namespace Storm
 {
 
-	void Init()
+	void Init(const std::string& evalFilename)
 	{
 #ifndef EMSCRIPTEN
 		Logger::Init();
 #endif
-		Network::Init();
 		InitRays();
 		InitAttacks();
 		InitZobristHash();
-		InitEvaluation();
+		InitEvaluation(evalFilename);
 		InitSearch();
 	}
 

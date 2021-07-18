@@ -188,9 +188,10 @@ namespace Storm
 				moveString += "=" + GetPieceName(GetPromotionPiece(move));
 			}
 		}
+		StateInfo st;
 		UndoInfo undo;
 		Position pos = position;
-		pos.ApplyMove(move, &undo);
+		pos.ApplyMove(move, st, &undo);
 		if (pos.InCheck())
 		{
 			Move buffer[MAX_MOVES];
@@ -338,6 +339,8 @@ namespace Storm
 		bool inComment = false;
 		std::string result = "";
 
+		StateInfo st;
+
 		for (std::string& line : lines)
 		{
 			CleanupString(line, CharsToRemove, sizeof(CharsToRemove) / sizeof(char));
@@ -445,7 +448,7 @@ namespace Storm
 										STORM_ASSERT(FormatMove(move, currentPosition) == str, "Invalid move");
 										currentMatch.Moves.push_back(move);
 										UndoInfo undo;
-										currentPosition.ApplyMove(move, &undo);
+										currentPosition.ApplyMove(move, st, &undo);
 									}
 									else
 									{

@@ -48,6 +48,7 @@ namespace Storm
 
     size_t Search::Perft(const Position& pos, int depth)
     {
+        StateInfo st;
         Position position = pos;
         UndoInfo undo;
         size_t total = 0;
@@ -68,7 +69,7 @@ namespace Storm
             movedPosition.ApplyMove(move, &undo);
             size_t perft = PerftPosition(movedPosition, depth - 1);
 #else
-            position.ApplyMove(move, &undo);
+            position.ApplyMove(move, st, &undo);
             size_t perft = PerftPosition(position, depth - 1);
             position.UndoMove(move, undo);
 #endif
@@ -112,7 +113,9 @@ namespace Storm
 
     BestMove Search::SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
     {
+        StateInfo st;
         Position pos = position;
+        pos.Reset(&st);
         m_Limits = limits;
         int depth = limits.Depth < 0 ? MAX_PLY : limits.Depth;
 
@@ -142,6 +145,7 @@ namespace Storm
     {
         if (depth <= 0)
             return 1;
+        StateInfo st;
         Move moves[MAX_MOVES];
         Move* it = moves;
         Move* end;
@@ -163,7 +167,7 @@ namespace Storm
             nodes += PerftPosition(movedPosition, depth - 1);
 #else
             Move move = *it++;
-            position.ApplyMove(move, &undo);
+            position.ApplyMove(move, st, &undo);
             nodes += PerftPosition(position, depth - 1);
             position.UndoMove(move, undo);
 #endif
@@ -203,7 +207,6 @@ namespace Storm
             {
                 m_TimeManager.StartNewDepth();
                 m_PvIndex = pvIndex;
-                m_Nodes = 0;
                 int selDepth = 0;
 
                 ValueType delta = 0;
@@ -230,7 +233,7 @@ namespace Storm
                     }
 
                     if (m_Log && multiPv == 1 && (value <= alpha || value >= beta) && m_TimeManager.TotalElapsedMs() > 3000)
-                        std::cout << FormatPV(m_RootMoves[0], alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.ElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
+                        std::cout << FormatPV(m_RootMoves[0], alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.TotalElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
 
                     if (value <= alpha && value != -VALUE_MATE)
                     {
@@ -266,7 +269,7 @@ namespace Storm
                 {
                     if (m_Log)
                     {
-                        std::cout << FormatPV(rootMove, alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.ElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
+                        std::cout << FormatPV(rootMove, alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.TotalElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
                     }
                     if (callback)
                     {
@@ -314,6 +317,7 @@ namespace Storm
         STORM_ASSERT(alpha < beta, "Invalid alpha beta bounds");
         STORM_ASSERT(!(IsPvNode && cutNode), "Invalid configuration");
 
+        StateInfo st;
         Move pv[MAX_PLY];
         Move quietMoves[MAX_MOVES];
         int quietMoveCount = 0;
@@ -423,7 +427,7 @@ namespace Storm
             if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
             {
                 UndoInfo undo;
-                position.ApplyNullMove(&undo);
+                position.ApplyNullMove(st, &undo);
 
                 (stack + 1)->Position = position;
                 stack->CurrentMove = MOVE_NONE;
@@ -453,7 +457,7 @@ namespace Storm
                         (stack + 1)->Position.ApplyMove(move, &undo);
                         ValueType value = -QuiescenceSearch<NonPV>((stack + 1)->Position, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
 #else
-                        position.ApplyMove(move, &undo);
+                        position.ApplyMove(move, st, &undo);
                         (stack + 1)->Position = position;
                         ValueType value = -QuiescenceSearch<NonPV>(position, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
 #endif
@@ -564,7 +568,7 @@ namespace Storm
             (stack + 1)->Position = position;
             (stack + 1)->Position.ApplyMove(move, &undo, givesCheck);
 #else
-            position.ApplyMove(move, &undo, givesCheck);
+            position.ApplyMove(move, st, &undo, givesCheck);
             (stack + 1)->Position = position;
 #endif
             m_Nodes++;
@@ -698,6 +702,8 @@ namespace Storm
         STORM_ASSERT(stack->SkipMove == MOVE_NONE, "Invalid skip move");
         constexpr bool IsPvNode = NT == PV;
         const bool inCheck = position.InCheck();
+
+        StateInfo st;
         Move pv[MAX_PLY];
         UndoInfo undo;
 
@@ -775,7 +781,7 @@ namespace Storm
             pv[0] = MOVE_NONE;
             ValueType value = -QuiescenceSearch<NT>(movedPosition, stack + 1, 0, -beta, -alpha, cutNode);
 #else
-            position.ApplyMove(move, &undo, givesCheck);
+            position.ApplyMove(move, st, &undo, givesCheck);
             m_Nodes++;
             stack->CurrentMove = move;
             pv[0] = MOVE_NONE;

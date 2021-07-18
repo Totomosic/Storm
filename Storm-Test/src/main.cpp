@@ -221,8 +221,9 @@ namespace Test
 		REQUIRE(position.InCheck() == false);
 
 		UndoInfo undo;
+		StateInfo st;
 		Move move = UCI::CreateMoveFromString(position, "b5d7");
-		position.ApplyMove(move, &undo);
+		position.ApplyMove(move, st, &undo);
 
 		REQUIRE(position.InCheck() == true);
 	}
@@ -270,9 +271,11 @@ namespace Test
 		Init();
 
 		UndoInfo undo;
+		StateInfo info;
 		Position position = CreateStartingPosition();
-		position.ApplyMove(CreateMove(e2, e4), &undo);
-		position.ApplyMove(CreateMove(a7, a6), &undo);
+		position.Reset(&info);
+		position.ApplyMove(CreateMove(e2, e4), info, &undo);
+		position.ApplyMove(CreateMove(a7, a6), info, &undo);
 
 		REQUIRE(!position.SeeGE(CreateMove(f1, a6)));
 

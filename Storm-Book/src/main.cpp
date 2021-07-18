@@ -68,13 +68,14 @@ bool HandleAdd(const std::vector<std::string>& args)
 			Move mv = UCI::CreateMoveFromString(position, move);
 			if (IsLegalMove(mv, position))
 			{
+				StateInfo st;
 				BookEntry entry;
 				entry.Hash = position.Hash;
 				entry.From = GetFromSquare(mv);
 				entry.To = GetToSquare(mv);
 				entry.Count = 1;
 				entries.push_back(entry);
-				position.ApplyMove(mv, &undo);
+				position.ApplyMove(mv, st, &undo);
 			}
 			else
 			{
@@ -103,13 +104,14 @@ bool HandleAddPGN(const std::vector<std::string>& args)
 			Move mv = PGN::CreateMoveFromString(position, move);
 			if (IsLegalMove(mv, position))
 			{
+				StateInfo st;
 				BookEntry entry;
 				entry.Hash = position.Hash;
 				entry.From = GetToSquare(mv);
 				entry.To = GetFromSquare(mv);
 				entry.Count = 1;
 				entries.push_back(entry);
-				position.ApplyMove(mv, &undo);
+				position.ApplyMove(mv, st, &undo);
 			}
 			else
 			{
@@ -181,13 +183,14 @@ bool HandleLoadPGN(const std::vector<std::string>& args)
 				Position position = match.InitialPosition;
 				for (int i = 0; i < MOVE_COUNT; i++)
 				{
+					StateInfo st;
 					BookEntry entry;
 					entry.Hash = position.Hash;
 					entry.Count = 1;
 					entry.From = GetFromSquare(match.Moves[i]);
 					entry.To = GetToSquare(match.Moves[i]);
 					s_Book.AppendEntry(entry);
-					position.ApplyMove(match.Moves[i], &undo);
+					position.ApplyMove(match.Moves[i], st, &undo);
 				}
 				if (s_Book.GetCardinality() < MOVE_COUNT)
 					s_Book.SetCardinality(MOVE_COUNT);

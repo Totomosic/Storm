@@ -1,6 +1,9 @@
 #include "Evaluation.h"
 #include "Attacks.h"
 
+#include "nnue/evaluate_nnue.h"
+#include <fstream>
+
 namespace Storm
 {
 
@@ -24,9 +27,13 @@ namespace Storm
 		}
 	}
 
-	void InitEvaluation()
+	void InitEvaluation(const std::string& evalFilename)
 	{
 		InitPassedPawnMasks();
+
+		std::ifstream stream(evalFilename, std::ios::binary);
+		if (NNUE::load_eval(evalFilename, stream))
+			std::cout << "Loaded network " << evalFilename << std::endl;
 	}
 
 	template<Color C>
@@ -405,18 +412,15 @@ namespace Storm
 		return result;
 	}
 
-	ValueType EvaluateNNUE(const Position& position)
-	{
-		ValueType whiteSideRaw = position.Evaluate();
-		ValueType eval = whiteSideRaw * 94 / 100;
-		return (position.ColorToMove == COLOR_WHITE ? eval : -eval) + Tempo;
-	}
-
 	ValueType Evaluate(const Position& position)
 	{
+		ValueType eval;
 		if (position.IsNetworkEnabled())
-			return EvaluateNNUE(position);
-		return EvaluateDetailed(position).Result(position.ColorToMove);
+			eval = NNUE::EvaluateNNUE(position, true);
+		else
+			eval = EvaluateDetailed(position).Result(position.ColorToMove);
+		eval = eval * (100 - position.HalfTurnsSinceCaptureOrPush) / 100;
+		return eval;
 	}
 
 	// =================================================================================================================================

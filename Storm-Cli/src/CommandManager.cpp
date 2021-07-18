@@ -319,7 +319,8 @@ namespace Storm
 					{
 						if (m_CurrentPosition.IsLegal(move))
 						{
-							m_CurrentPosition.ApplyMove(move, &m_Undo);
+							StateInfo st;
+							m_CurrentPosition.ApplyMove(move, st, &m_Undo);
 							m_UndoMove = move;
 							m_Search.PushPosition(m_CurrentPosition.Hash);
 							legal = true;
@@ -339,16 +340,20 @@ namespace Storm
 
 	void CommandManager::Eval()
 	{
+		StateInfo st;
+		m_CurrentPosition.Reset(&st);
 		EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
 		std::cout << FormatEvaluation(evaluation) << std::endl;
 		if (m_CurrentPosition.IsNetworkEnabled())
-			std::cout << "NNUE evaluation: " << EvaluateNNUE(m_CurrentPosition) * (m_CurrentPosition.ColorToMove == COLOR_WHITE ? 1 : -1) << " (white side)" << std::endl;
+			std::cout << "NNUE evaluation: " << NNUE::EvaluateNNUE(m_CurrentPosition, true) * (m_CurrentPosition.ColorToMove == COLOR_WHITE ? 1 : -1) << " (white side)" << std::endl;
 	}
 
 	void CommandManager::Perft(int depth)
 	{
 		if (!m_Searching)
 		{
+			StateInfo st;
+			m_CurrentPosition.Reset(&st);
 			m_Search.Perft(m_CurrentPosition, depth);
 		}
 	}
@@ -357,8 +362,8 @@ namespace Storm
 	{
 		if (args.size() > 0)
 		{
-			m_CurrentPosition.ResetNetwork();
 			SearchLimits limits;
+			m_CurrentPosition.Reset(&m_StateInfo);
 
 			size_t moveStartIndex = 0;
 			for (size_t i = 0; i < args.size(); i++)
