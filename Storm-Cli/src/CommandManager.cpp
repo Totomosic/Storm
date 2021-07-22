@@ -4,7 +4,7 @@ namespace Storm
 {
 
 	CommandManager::CommandManager()
-		: m_CommandMap(), m_OpeningBook(), m_CurrentPosition(CreateStartingPosition()), m_Search(128 * 1024 * 1024), m_Searching(false), m_SearchThread(), m_UndoMove(MOVE_NONE), m_Undo()
+		: m_CommandMap(), m_OpeningBook(), m_CurrentPosition(CreateStartingPosition()), m_Search(), m_Searching(false), m_SearchThread(), m_UndoMove(MOVE_NONE), m_Undo()
 	{
 		m_CurrentPosition.SetNetworkEnabled(true);
 		m_CommandMap["help"] = [this](const std::vector<std::string>& args)
@@ -270,7 +270,7 @@ namespace Storm
 		{
 			m_Settings.SkillLevel = std::min(std::max(0, std::stoi(*value)), 20);
 		}
-		if (name == "book")
+		/*if (name == "book")
 		{
 			m_OpeningBook.Clear();
 			if (value != nullptr && m_OpeningBook.AppendFromFile(*value))
@@ -282,7 +282,7 @@ namespace Storm
 				std::cout << "Disabling opening book..." << std::endl;
 				m_Search.SetOpeningBook(nullptr);
 			}
-		}
+		}*/
 		m_Search.SetSettings(m_Settings);
 	}
 
@@ -342,8 +342,9 @@ namespace Storm
 	{
 		StateInfo st;
 		m_CurrentPosition.Reset(&st);
-		EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
-		std::cout << FormatEvaluation(evaluation) << std::endl;
+		// EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
+		// std::cout << FormatEvaluation(evaluation) << std::endl;
+		std::cout << FormatNNUEEvaluation(m_CurrentPosition) << std::endl;
 		if (m_CurrentPosition.IsNetworkEnabled())
 			std::cout << "NNUE evaluation: " << NNUE::EvaluateNNUE(m_CurrentPosition, true) * (m_CurrentPosition.ColorToMove == COLOR_WHITE ? 1 : -1) << " (white side)" << std::endl;
 	}
@@ -407,8 +408,8 @@ namespace Storm
 				{
 					BestMove bestMove = m_Search.SearchBestMove(m_CurrentPosition, limits);
 					std::cout << "bestmove " << UCI::FormatMove(bestMove.Move);
-					if (bestMove.Ponder != MOVE_NONE)
-						std::cout << " ponder " << UCI::FormatMove(bestMove.Ponder);
+					if (bestMove.PonderMove != MOVE_NONE)
+						std::cout << " ponder " << UCI::FormatMove(bestMove.PonderMove);
 					std::cout << std::endl;
 					m_Searching = false;
 				});
@@ -456,7 +457,7 @@ namespace Storm
 			std::cout << "No book entry found" << std::endl;
 		}
 
-		const TranspositionTable& tt = m_Search.GetTranspositionTable();
+		/*const TranspositionTable& tt = m_Search.GetTranspositionTable();
 		bool ttHit;
 		TranspositionTableEntry* entry = tt.GetEntry(m_CurrentPosition.Hash, ttHit);
 		if (ttHit)
@@ -470,7 +471,7 @@ namespace Storm
 		else
 		{
 			std::cout << "No transposition table entry found. Entry hash: " << std::hex << entry->GetHash().Hash << std::dec << std::endl;
-		}
+		}*/
 	}
 
 	void CommandManager::Stop()

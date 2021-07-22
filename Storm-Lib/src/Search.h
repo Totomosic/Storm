@@ -1,4 +1,6 @@
 #pragma once
+#define OLD_SEARCH 0
+#if OLD_SEARCH
 #include "Position.h"
 #include "MoveSelection.h"
 #include "Format.h"
@@ -52,7 +54,7 @@ namespace Storm
 	{
 	public:
 		Storm::Move Move;
-		Storm::Move Ponder = MOVE_NONE;
+		Storm::Move PonderMove = MOVE_NONE;
 	};
 
 	struct STORM_API SearchSettings
@@ -101,7 +103,7 @@ namespace Storm
 		std::unique_ptr<SearchTables> m_SearchTables;
 
 	public:
-		Search(size_t ttSize, bool log = true);
+		Search(size_t ttSize = 128 * 1024 * 1024, bool log = true);
 
 		inline const SearchSettings& GetSettings() const { return m_Settings; }
 		inline const TranspositionTable& GetTranspositionTable() const { return m_TranspositionTable; }
@@ -172,3 +174,4 @@ namespace Storm
 	};
 
 }
+#endif

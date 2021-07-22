@@ -172,20 +172,10 @@ namespace Storm::NNUE {
 
     int sum = (A * materialist + B * positional) / 128;
 
-    // int scale = 903 + 32 * Popcount(pos.GetPieces(PIECE_PAWN)) + 32 * pos.GetNonPawnMaterial() / 500;
+    // int scale = 900 + 32 * Popcount(pos.GetPieces(PIECE_PAWN)) + 32 * pos.GetNonPawnMaterial() / 512;
 
     return static_cast<ValueType>( sum / OutputScale ) * 130 / 208;
   }
-
-  struct NnueEvalTrace {
-    static_assert(LayerStacks == PSQTBuckets);
-
-    ValueType psqt[LayerStacks];
-    ValueType positional[LayerStacks];
-    std::size_t correctBucket;
-  };
-
-  static const std::string PieceToChar(" PNBRQK  pnbrqk");
 
   // Load eval, from a file stream or a memory stream
   bool load_eval(std::string name, std::istream& stream) {

@@ -11,7 +11,7 @@ namespace Storm
 {
 
 	// Keep track of what a move changes on the board (used by NNUE)
-	struct DirtyPiece
+	struct STORM_API DirtyPiece
 	{
 	public:
 		// Number of changed pieces
@@ -27,7 +27,7 @@ namespace Storm
 		SquareIndex to[3];
 	};
 
-	struct StateInfo
+	struct STORM_API StateInfo
 	{
 	public:
 		Storm::NNUE::Accumulator Accumulator;
@@ -35,7 +35,7 @@ namespace Storm
 		StateInfo* Previous;
 	};
 
-	struct UndoInfo
+	struct STORM_API UndoInfo
 	{
 	public:
 		SquareIndex EnpassantSquare;
@@ -154,6 +154,9 @@ namespace Storm
 
 		inline bool IsNetworkAvailable() const { return true; }
 		inline bool IsNetworkEnabled() const { return m_UseNetwork && IsNetworkAvailable(); }
+
+		void AddPiece(ColorPiece piece, SquareIndex square);
+		void RemovePiece(SquareIndex square);
 
 	private:
 		void MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to);

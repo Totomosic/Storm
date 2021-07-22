@@ -7,11 +7,12 @@
 #include "MoveGeneration.h"
 #include "Position.h"
 #include "Search.h"
+#include "SearchThread.h"
 #include "Book.h"
 
 namespace Storm
 {
 
-	void Init(const std::string& evalFilename = "nn-9e3c6298299a.nnue");
+	void Init(const std::string& evalFilename = "");
 
 }

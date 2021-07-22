@@ -1,15 +1,34 @@
-#include "Search.h"
-#if OLD_SEARCH
+#include "SearchThread.h"
 
-#include <chrono>
-#include <random>
-
-#define STORM_USE_UNDO 1
+#if NEW_SEARCH
 
 namespace Storm
 {
 
     int LmrReductions[MAX_PLY][MAX_MOVES];
+
+    template<typename T, size_t Width, size_t Height>
+    void ClearTable(T table[Width][Height], T value)
+    {
+        for (size_t i = 0; i < Width; i++)
+        {
+            for (size_t j = 0; j < Height; j++)
+                table[i][j] = value;
+        }
+    }
+
+    template<typename T, size_t Width, size_t Height, size_t Depth>
+    void ClearTable(T table[Width][Height][Depth], T value)
+    {
+        for (size_t i = 0; i < Width; i++)
+        {
+            for (size_t j = 0; j < Height; j++)
+            {
+                for (size_t k = 0; k < Depth; k++)
+                    table[i][j][k] = value;
+            }
+        }
+    }
 
     void InitSearch()
     {
@@ -29,23 +48,29 @@ namespace Storm
         *pv = MOVE_NONE;
     }
 
-    Search::Search(size_t ttSize, bool log)
-        : m_TranspositionTable(ttSize), m_PositionHistory(), m_Settings(), m_TimeManager(), m_Book(nullptr), m_Log(log), m_Limits(), m_RootMoves(), m_Nodes(0), m_PvIndex(0),
-        m_Stopped(false), m_ShouldStop(false), m_SearchTables(std::make_unique<SearchTables>())
+    Search::Search()
+        : m_TimeManager(), m_TranspositionTable(128 * 1024 * 1024), m_Limits(), m_ShouldStop(false), m_Stopped(false), m_Threads()
     {
-        ClearTable<Move, SQUARE_MAX, SQUARE_MAX>(m_SearchTables->CounterMoves, MOVE_NONE);
-        ClearTable<int16_t, COLOR_MAX, SQUARE_MAX, SQUARE_MAX>(m_SearchTables->History, 0);
-        ClearTable<int16_t, P_LIMIT, SQUARE_MAX, P_LIMIT * SQUARE_MAX>(m_SearchTables->CounterMoveHistory, 0);
-    }
-
-    void Search::SetSettings(const SearchSettings& settings)
-    {
-        m_Settings = settings;
     }
 
     void Search::PushPosition(const ZobristHash& hash)
     {
         m_PositionHistory.push_back(hash);
+    }
+
+    void Search::Ponder(const Position& position, SearchLimits limits)
+    {
+        limits.Infinite = true;
+        SearchBestMove(position, limits);
+    }
+
+    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits)
+    {
+        StateInfo st;
+        Position pos = position;
+        pos.Reset(&st);
+        m_Limits = limits;
+        return BeginSearch(pos, limits.Depth > 0 && !limits.Infinite ? limits.Depth : MAX_PLY);
     }
 
     size_t Search::Perft(const Position& pos, int depth)
@@ -58,84 +83,25 @@ namespace Storm
         MoveList moveList(moves);
         moveList.FillLegal<ALL>(position);
 
-        const bool networkWasEnabled = position.IsNetworkEnabled();
-        if (networkWasEnabled)
-            position.SetNetworkEnabled(false);
-
         auto startTime = std::chrono::high_resolution_clock::now();
 
         for (Move move : moveList)
         {
-#if !STORM_USE_UNDO
-            Position movedPosition = position;
-            movedPosition.ApplyMove(move, &undo);
-            size_t perft = PerftPosition(movedPosition, depth - 1);
-#else
             position.ApplyMove(move, st, &undo);
             size_t perft = PerftPosition(position, depth - 1);
             position.UndoMove(move, undo);
-#endif
-            
+
             total += perft;
 
-            if (m_Log)
-                std::cout << UCI::FormatMove(move) << ": " << perft << std::endl;
+            std::cout << UCI::FormatMove(move) << ": " << perft << std::endl;
         }
-        if (m_Log)
-        {
-            auto endTime = std::chrono::high_resolution_clock::now();
-            auto elapsed = endTime - startTime;
-            std::cout << "====================================" << std::endl;
-            std::cout << "Total Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << "ms" << std::endl;
-            std::cout << "Total Nodes: " << total << std::endl;
-            std::cout << "Nodes per Second: " << (size_t)(total / (double)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() * 1e9) << std::endl;
-        }
-
-        if (networkWasEnabled)
-            position.SetNetworkEnabled(true);
-
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto elapsed = endTime - startTime;
+        std::cout << "====================================" << std::endl;
+        std::cout << "Total Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << "ms" << std::endl;
+        std::cout << "Total Nodes: " << total << std::endl;
+        std::cout << "Nodes per Second: " << (size_t)(total / (double)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() * 1e9) << std::endl;
         return total;
-    }
-
-    void Search::Ponder(const Position& position, const std::function<void(const SearchResult&)>& callback)
-    {
-        Ponder(position, SearchLimits{}, callback);
-    }
-
-    void Search::Ponder(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
-    {
-        limits.Infinite = true;
-        SearchBestMove(position, limits, callback);
-    }
-
-    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits)
-    {
-        return SearchBestMove(position, limits, {});
-    }
-
-    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
-    {
-        StateInfo st;
-        Position pos = position;
-        pos.Reset(&st);
-        m_Limits = limits;
-        int depth = limits.Depth < 0 ? MAX_PLY : limits.Depth;
-
-        if (!m_Limits.Infinite && m_Book != nullptr && pos.GetTotalHalfMoves() <= m_Book->GetCardinality() && m_Limits.Only.empty())
-        {
-            auto collection = m_Book->Probe(pos.Hash);
-            if (collection)
-            {
-                BookEntry entry = collection->PickRandom();
-                Move move = CreateMoveFromEntry(entry, pos);
-                m_Limits.Only.insert(move);
-            }
-        }
-
-        RootMove move = SearchRoot(pos, depth, callback);
-        if (move.Pv.size() > 0)
-            return { move.Pv[0], move.Pv.size() > 1 ? move.Pv[1] : MOVE_NONE };
-        return { MOVE_NONE };
     }
 
     void Search::Stop()
@@ -163,157 +129,142 @@ namespace Storm
         size_t nodes = 0;
         while (it != end)
         {
-#if !STORM_USE_UNDO
-            Position movedPosition = position;
-            movedPosition.ApplyMove(*it++, &undo);
-            nodes += PerftPosition(movedPosition, depth - 1);
-#else
             Move move = *it++;
             position.ApplyMove(move, st, &undo);
             nodes += PerftPosition(position, depth - 1);
             position.UndoMove(move, undo);
-#endif
         }
         return nodes;
     }
 
-    RootMove Search::SearchRoot(Position& position, int depth, const std::function<void(const SearchResult&)>& callback)
+    BestMove Search::BeginSearch(Position& position, int depth)
     {
-        m_RootMoves = GenerateRootMoves(position, m_Limits.Only);
-        if (m_RootMoves.empty())
-            return {};
-
         m_Stopped = false;
         m_ShouldStop = false;
-       
-        SetTimeManagementFromLimits(position, m_Limits);
-        m_TimeManager.StartSearch();
-        int rootDepth = 1;
+        InitTimeManagement(position);
+        CreateAndInitializeThreads(position, 1);
 
-        Move pv[MAX_PLY];
-        ZobristHash* positionHistory = new ZobristHash[m_PositionHistory.size() + MAX_PLY + 1];
-        pv[0] = MOVE_NONE;
-        SearchStack stack[MAX_PLY + 10];
-        SearchStack* stackPtr = InitStack(stack, 4, position, pv, positionHistory);
-
-        int skillLevelMultiPv = GetMultiPv(m_Settings.SkillLevel);
-        int multiPv = std::max({ m_Settings.MultiPv, skillLevelMultiPv, 1 });
-        multiPv = std::min(multiPv, int(m_RootMoves.size()));
-        
-        ValueType alpha = -VALUE_MATE;
-        ValueType beta = VALUE_MATE;
-
-        m_Nodes = 0;
-
-        while (rootDepth <= depth)
+        IterativeDeepeningSearch(&m_Threads[0], depth);
+        Move bestMove = MOVE_NONE;
+        Move ponderMove = MOVE_NONE;
+        Thread& mainThread = m_Threads[0];
+        if (mainThread.RootMoves.size() > 1)
         {
-            for (int pvIndex = 0; pvIndex < multiPv; pvIndex++)
-            {
-                m_TimeManager.StartNewDepth();
-                m_PvIndex = pvIndex;
-                int selDepth = 0;
-
-                ValueType delta = 0;
-                if (depth >= AspirationWindowDepth)
-                {
-                    delta = InitialAspirationWindow;
-                    alpha = std::max<ValueType>(m_RootMoves[pvIndex].PreviousScore - delta, -VALUE_MATE);
-                    beta = std::min<ValueType>(m_RootMoves[pvIndex].PreviousScore + delta, VALUE_MATE);
-                }
-
-                int betaCutoffs = 0;
-
-                while (true)
-                {
-                    int adjustedDepth = std::max(1, rootDepth - betaCutoffs);
-                    ValueType value = SearchPosition<PV>(position, stackPtr, adjustedDepth, alpha, beta, selDepth, false);
-
-                    std::stable_sort(m_RootMoves.begin() + pvIndex, m_RootMoves.end());
-
-                    if (CheckLimits())
-                    {
-                        m_Stopped = true;
-                        break;
-                    }
-
-                    if (m_Log && multiPv == 1 && (value <= alpha || value >= beta) && m_TimeManager.TotalElapsedMs() > 3000)
-                        std::cout << FormatPV(m_RootMoves[0], alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.TotalElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
-
-                    if (value <= alpha && value != -VALUE_MATE)
-                    {
-                        beta = (alpha + beta) / 2;
-                        alpha = std::max<ValueType>(value - delta, -VALUE_MATE);
-                        betaCutoffs = 0;
-                    }
-                    else if (value >= beta && value != VALUE_MATE)
-                    {
-                        beta = std::min<ValueType>(value + delta, VALUE_MATE);
-                        betaCutoffs++;
-                    }
-                    else
-                        break;
-                    delta += delta * 2 / 3;
-                }
-
-                if (CheckLimits())
-                {
-                    m_Stopped = true;
-                    break;
-                }
-
-                for (RootMove& mv : m_RootMoves)
-                    mv.PreviousScore = mv.Score;
-
-                std::stable_sort(m_RootMoves.begin(), m_RootMoves.begin() + pvIndex + 1);
-
-                RootMove& rootMove = m_RootMoves[pvIndex];
-
-                // Don't report lines that are generated due to SkillLevel
-                if (pvIndex < m_Settings.MultiPv)
-                {
-                    if (m_Log)
-                    {
-                        std::cout << FormatPV(rootMove, alpha, beta, rootDepth, pvIndex, m_Nodes, m_TimeManager.TotalElapsedMs(), m_Limits.Only.size() == 1) << std::endl;
-                    }
-                    if (callback)
-                    {
-                        SearchResult result;
-                        result.BestMove = rootMove.Pv.size() > 0 ? rootMove.Pv[0] : MOVE_NONE;
-                        result.PV = rootMove.Pv;
-                        result.Score = rootMove.Score;
-                        result.PVIndex = pvIndex;
-                        result.Depth = rootDepth;
-                        result.SelDepth = selDepth;
-                        callback(result);
-                    }
-                }
-            }
-
-            if (CheckLimits())
-            {
-                m_Stopped = true;
-                break;
-            }
-
-            rootDepth++;
+            bestMove = mainThread.RootMoves[0].Pv[0];
+            if (mainThread.RootMoves[0].Pv.size() > 1)
+                ponderMove = mainThread.RootMoves[0].Pv[1];
         }
-
-        // The previous score is guaranteed to be from a completed search
-        for (RootMove& mv : m_RootMoves)
-            mv.Score = mv.PreviousScore;
-        std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
-
-        delete[] positionHistory;
-        if (m_RootMoves.empty())
-            return {};
-        return m_RootMoves[SelectBestMoveIndex(std::min(multiPv, skillLevelMultiPv), m_Settings.SkillLevel)];
+        return { bestMove, ponderMove };
     }
 
-    template<Search::NodeType NT>
-    inline ValueType Search::SearchPosition(Position& position, SearchStack* stack, int depth, ValueType alpha, ValueType beta, int& selDepth, bool cutNode)
+    void Search::IterativeDeepeningSearch(Thread* thread, int maxDepth)
+    {
+        SearchStack* stack = thread->Stack + Thread::StackOffset;
+        bool isMainThread = true;
+
+        while (thread->Depth <= maxDepth)
+        {
+            for (int i = 0; i < std::clamp(m_Settings.MultiPv, 1, std::min(20, (int)thread->RootMoves.size())); i++)
+            {
+                thread->PvIndex = i;
+                thread->SelDepth = 0;
+                ValueType value = AspirationWindowSearch(thread, stack);
+
+                if (ShouldStopSearch(thread))
+                    break;
+
+                if (!isMainThread)
+                    continue;
+            }
+
+            if (ShouldStopSearch(thread))
+                break;
+
+            for (RootMove& mv : thread->RootMoves)
+                mv.PreviousScore = mv.Score;
+            std::stable_sort(thread->RootMoves.begin(), thread->RootMoves.end());
+
+            thread->Depth++;
+        }
+    }
+
+    ValueType Search::AspirationWindowSearch(Thread* thread, SearchStack* stack)
+    {
+        bool isMainThread = true;
+        int depth = thread->Depth;
+        ValueType value = thread->RootMoves[0].PreviousScore;
+        ValueType delta = 0;
+        ValueType alpha = -VALUE_MATE;
+        ValueType beta = VALUE_MATE;
+        if (depth >= AspirationWindowDepth)
+        {
+            delta = InitialAspirationWindow;
+            alpha = std::max<ValueType>(value - delta, -VALUE_MATE);
+            beta = std::min<ValueType>(value + delta, VALUE_MATE);
+        }
+
+        int betaCutoffs = 0;
+        while (true)
+        {
+            int adjustedDepth = std::max(1, depth - betaCutoffs);
+            value = AlphaBetaSearch<true>(thread, stack, adjustedDepth, alpha, beta, false);
+
+            std::stable_sort(thread->RootMoves.begin() + thread->PvIndex, thread->RootMoves.end());
+
+            if (ShouldStopSearch(thread))
+                break;
+
+            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000))
+            {
+                RootMove& bestMove = thread->RootMoves[thread->PvIndex];
+                std::cout << "info depth " << depth << " seldepth " << thread->SelDepth << " score ";
+                if (!IsMateScore(bestMove.Score))
+                {
+                    std::cout << "cp " << bestMove.Score;
+                }
+                else
+                {
+                    if (bestMove.Score > 0)
+                        std::cout << "mate " << (GetPliesFromMateScore(bestMove.Score) / 2 + 1);
+                    else
+                        std::cout << "mate " << -(GetPliesFromMateScore(bestMove.Score) / 2);
+                }
+                if (bestMove.Score <= alpha)
+                    std::cout << " upperbound";
+                else if (bestMove.Score >= beta)
+                    std::cout << " lowerbound";
+                std::cout << " nodes " << thread->Nodes << " nps " << size_t(thread->Nodes * 1000 / (m_TimeManager.TotalElapsedMs() + 1));
+                std::cout << " time " << m_TimeManager.TotalElapsedMs() << " multipv " << thread->PvIndex + 1;
+                std::cout << " pv";
+                for (Move mv : bestMove.Pv)
+                    std::cout << " " << UCI::FormatMove(mv);
+                std::cout << std::endl;
+            }
+
+            if (value <= alpha && value != -VALUE_MATE)
+            {
+                beta = (alpha + beta) / 2;
+                alpha = std::max<ValueType>(value - delta, -VALUE_MATE);
+                betaCutoffs = 0;
+            }
+            else if (value >= beta && value != VALUE_MATE)
+            {
+                beta = std::min<ValueType>(value + delta, VALUE_MATE);
+                betaCutoffs++;
+            }
+            else
+                break;
+            delta += delta * 2 / 3;
+        }
+
+        return value;
+    }
+
+    template<bool IsPvNode>
+    ValueType Search::AlphaBetaSearch(Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode)
     {
         constexpr int FirstMoveIndex = 1;
-        constexpr bool IsPvNode = NT == PV;
+        Position& position = *thread->Position;
         const bool IsRoot = IsPvNode && stack->Ply == 0;
         const bool inCheck = position.InCheck();
 
@@ -344,10 +295,10 @@ namespace Storm
             return Evaluate(position);
 
         if (depth <= 0)
-            return QuiescenceSearch<NT>(position, stack, depth, alpha, beta, cutNode);
+            return QuiescenceSearch<IsPvNode>(thread, stack, depth, alpha, beta, cutNode);
 
-        if (stack->Ply >= selDepth)
-            selDepth = stack->Ply + 1;
+        if (stack->Ply >= thread->SelDepth)
+            thread->SelDepth = stack->Ply + 1;
 
         if (!IsRoot && IsDraw(position, stack))
             return VALUE_DRAW;
@@ -361,7 +312,7 @@ namespace Storm
                 return alpha;
         }
 
-        SetCounterMoveHistoryPointer(cmhPtr, stack, &m_SearchTables->CounterMoveHistory, stack->Ply);
+        SetCounterMoveHistoryPointer(cmhPtr, stack, &thread->Tables.CounterMoveHistory, stack->Ply);
 
         Move previousMove = (stack - 1)->CurrentMove;
         Move move;
@@ -377,8 +328,8 @@ namespace Storm
         }
         ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
 
-        ValueType ttValue = IsRoot ? m_RootMoves[m_PvIndex].Score : ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
-        Move ttMove = IsRoot ? m_RootMoves[m_PvIndex].Pv[0] : ttHit ? ttEntry->GetMove() : MOVE_NONE;
+        ValueType ttValue = IsRoot ? thread->RootMoves[thread->PvIndex].Score : ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
+        Move ttMove = IsRoot ? thread->RootMoves[thread->PvIndex].Pv[0] : ttHit ? ttEntry->GetMove() : MOVE_NONE;
 
         if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
         {
@@ -390,11 +341,11 @@ namespace Storm
                 {
                     if (bound == BOUND_LOWER)
                     {
-                        UpdateQuietStats(stack, ttMove);
-                        AddToHistory(position, stack, cmhPtr, m_SearchTables.get(), ttMove, GetHistoryValue(depth));
+                        UpdateQuietStats(thread, stack, ttMove);
+                        AddToHistory(position, stack, cmhPtr, &thread->Tables, ttMove, GetHistoryValue(depth));
                     }
                     else if (bound == BOUND_UPPER)
-                        AddToHistory(position, stack, cmhPtr, m_SearchTables.get(), ttMove, -GetHistoryValue(depth));
+                        AddToHistory(position, stack, cmhPtr, &thread->Tables, ttMove, -GetHistoryValue(depth));
                 }
                 return ttValue;
             }
@@ -406,7 +357,7 @@ namespace Storm
             if (ttHit)
                 stack->StaticEvaluation = ttEntry->GetStaticEvaluation();
             else if ((stack - 1)->CurrentMove == MOVE_NONE && (stack - 1)->StaticEvaluation > VALUE_NONE)
-                stack->StaticEvaluation = -(stack - 1)->StaticEvaluation + 2 * Tempo;
+                stack->StaticEvaluation = -(stack - 1)->StaticEvaluation;
             else
                 stack->StaticEvaluation = Evaluate(position);
         }
@@ -418,7 +369,7 @@ namespace Storm
             // Razoring
             if (depth <= RazorDepth && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation + RazorMargin < beta)
             {
-                ValueType value = QuiescenceSearch<NonPV>(position, stack, 0, alpha, beta, cutNode);
+                ValueType value = QuiescenceSearch<false>(thread, stack, 0, alpha, beta, cutNode);
                 if (value < beta)
                     return value;
             }
@@ -439,7 +390,7 @@ namespace Storm
                 stack->CurrentMove = MOVE_NONE;
                 stack->MoveCount = FirstMoveIndex;
 
-                ValueType value = -SearchPosition<NonPV>(position, stack + 1, depth - GetNullMoveDepthReduction(depth, stack->StaticEvaluation, beta), -beta, -beta + 1, selDepth, true);
+                ValueType value = -AlphaBetaSearch<false>(thread, stack + 1, depth - GetNullMoveDepthReduction(depth, stack->StaticEvaluation, beta), -beta, -beta + 1, true);
                 position.UndoNullMove(undo);
                 if (value >= beta)
                     return IsMateScore(value) ? beta : value;
@@ -458,28 +409,15 @@ namespace Storm
                     if (move != stack->SkipMove && position.IsLegal(move))
                     {
                         stack->CurrentMove = move;
-#if !STORM_USE_UNDO
-                        (stack + 1)->Position = position;
-                        (stack + 1)->Position.ApplyMove(move, &undo);
-                        ValueType value = -QuiescenceSearch<NonPV>((stack + 1)->Position, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
-#else
                         position.ApplyMove(move, st, &undo);
                         (stack + 1)->Position = position;
-                        ValueType value = -QuiescenceSearch<NonPV>(position, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
-#endif
-
+                        ValueType value = -QuiescenceSearch<false>(thread, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
                         if (value >= probCutBeta)
                         {
-#if !STORM_USE_UNDO
-                            value = -SearchPosition<NonPV>((stack + 1)->Position, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, selDepth, !cutNode);
-#else
-                            value = -SearchPosition<NonPV>(position, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, selDepth, !cutNode);
-#endif
+                            value = -AlphaBetaSearch<false>(thread, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, !cutNode);
                         }
 
-#if STORM_USE_UNDO
                         position.UndoMove(move, undo);
-#endif
 
                         if (value >= probCutBeta)
                         {
@@ -490,8 +428,8 @@ namespace Storm
             }
         }
 
-        Move counterMove = m_SearchTables->CounterMoves[GetFromSquare(previousMove)][GetToSquare(previousMove)];
-        MoveSelector<ALL_MOVES> selector(position, stack, ttMove, counterMove, stack->Killers, m_SearchTables.get());
+        Move counterMove = thread->Tables.CounterMoves[GetFromSquare(previousMove)][GetToSquare(previousMove)];
+        MoveSelector<ALL_MOVES> selector(position, stack, ttMove, counterMove, stack->Killers, &thread->Tables);
 
         ValueType bestValue = -VALUE_MATE;
         Move bestMove = MOVE_NONE;
@@ -499,13 +437,13 @@ namespace Storm
 
         while ((move = selector.GetNextMove()) != MOVE_NONE)
         {
-            if (IsRoot && std::find(m_RootMoves.begin() + m_PvIndex, m_RootMoves.end(), move) == m_RootMoves.end())
+            if (IsRoot && std::find(thread->RootMoves.begin() + thread->PvIndex, thread->RootMoves.end(), move) == thread->RootMoves.end())
                 continue;
 
             if (move == stack->SkipMove)
                 continue;
 
-            if (m_Log && IsRoot && m_TimeManager.TotalElapsedMs() > 3000)
+            if (IsRoot && m_TimeManager.TotalElapsedMs() > 3000)
                 std::cout << "info depth " << depth << " currmove " << UCI::FormatMove(move) << " currmovenumber " << moveIndex + 1 << std::endl;
 
             const bool givesCheck = position.GivesCheck(move);
@@ -536,10 +474,10 @@ namespace Storm
             if (!IsRoot && !position.IsLegal(move))
                 continue;
 
-            moveIndex++;
+            ++moveIndex;
             stack->MoveCount = moveIndex;
 
-            STORM_ASSERT(m_PvIndex != 0 || moveIndex != FirstMoveIndex || ttMove == MOVE_NONE || move == ttMove || ttMove == stack->SkipMove, "Invalid move ordering");
+            STORM_ASSERT(moveIndex != FirstMoveIndex || ttMove == MOVE_NONE || move == ttMove || ttMove == stack->SkipMove, "Invalid move ordering");
 
             int newDepth = depth - 1;
             int depthExtension = 0;
@@ -549,7 +487,7 @@ namespace Storm
             {
                 ValueType singularBeta = GetSingularBeta(ttValue, depth);
                 stack->SkipMove = move;
-                ValueType score = SearchPosition<NonPV>(position, stack, GetSingularDepth(depth), singularBeta - 1, singularBeta, selDepth, cutNode);
+                ValueType score = AlphaBetaSearch<false>(thread, stack, GetSingularDepth(depth), singularBeta - 1, singularBeta, cutNode);
                 stack->SkipMove = MOVE_NONE;
                 if (score < singularBeta)
                     depthExtension = 1;
@@ -570,14 +508,9 @@ namespace Storm
 
             size_t preHash = position.Hash.Hash;
 
-#if !STORM_USE_UNDO
-            (stack + 1)->Position = position;
-            (stack + 1)->Position.ApplyMove(move, &undo, givesCheck);
-#else
             position.ApplyMove(move, st, &undo, givesCheck);
             (stack + 1)->Position = position;
-#endif
-            m_Nodes++;
+            ++thread->Nodes;
 
             size_t postHash = position.Hash.Hash;
 
@@ -592,15 +525,11 @@ namespace Storm
                 if ((stack - 1)->MoveCount > 13)
                     reduction--;
 
-                reduction -= 2 * GetHistoryScore(stack, stack->Position, cmhPtr, move, m_SearchTables.get()) / MAX_HISTORY_SCORE;
+                reduction -= 2 * GetHistoryScore(stack, stack->Position, cmhPtr, move, &thread->Tables) / MAX_HISTORY_SCORE;
 
                 int lmrDepth = std::clamp(newDepth - reduction, 1, newDepth);
-#if !STORM_USE_UNDO
-                value = -SearchPosition<NonPV>((stack + 1)->Position, stack + 1, lmrDepth, -(alpha + 1), -alpha, selDepth, true);
-#else
-                value = -SearchPosition<NonPV>(position, stack + 1, lmrDepth, -(alpha + 1), -alpha, selDepth, true);
+                value = -AlphaBetaSearch<false>(thread, stack + 1, lmrDepth, -(alpha + 1), -alpha, true);
                 STORM_ASSERT(position.Hash.Hash == postHash, "Invalid");
-#endif
                 fullDepthSearch = value > alpha && lmrDepth != newDepth;
             }
             else
@@ -610,31 +539,22 @@ namespace Storm
 
             if (fullDepthSearch)
             {
-#if !STORM_USE_UNDO
-                value = -SearchPosition<NonPV>((stack + 1)->Position, stack + 1, newDepth, -(alpha + 1), -alpha, selDepth, !cutNode);
-#else
-                value = -SearchPosition<NonPV>(position, stack + 1, newDepth, -(alpha + 1), -alpha, selDepth, !cutNode);
+                value = -AlphaBetaSearch<false>(thread, stack + 1, newDepth, -(alpha + 1), -alpha, !cutNode);
                 STORM_ASSERT(position.Hash.Hash == postHash, "Invalid");
-#endif
             }
             if (IsPvNode && (moveIndex == FirstMoveIndex || (value > alpha && (IsRoot || value < beta))))
             {
                 pv[0] = MOVE_NONE;
                 (stack + 1)->PV = pv;
-#if !STORM_USE_UNDO
-                value = -SearchPosition<PV>((stack + 1)->Position, stack + 1, newDepth, -beta, -alpha, selDepth, false);
-#else
-                value = -SearchPosition<PV>(position, stack + 1, newDepth, -beta, -alpha, selDepth, false);
+
+                value = -AlphaBetaSearch<true>(thread, stack + 1, newDepth, -beta, -alpha, false);
                 STORM_ASSERT(position.Hash.Hash == postHash, "Invalid");
-#endif
             }
 
-#if STORM_USE_UNDO
             position.UndoMove(move, undo);
             STORM_ASSERT(position.Hash.Hash == preHash, "Invalid {} {}", GetFENFromPosition(position), UCI::FormatMove(move));
-#endif
 
-            if (CheckLimits())
+            if (ShouldStopSearch(thread))
             {
                 m_Stopped = true;
                 return VALUE_NONE;
@@ -642,11 +562,11 @@ namespace Storm
 
             if (IsRoot)
             {
-                RootMove& rootMove = *std::find(m_RootMoves.begin() + m_PvIndex, m_RootMoves.end(), move);
+                RootMove& rootMove = *std::find(thread->RootMoves.begin(), thread->RootMoves.end(), move);
                 if (moveIndex == FirstMoveIndex || (value > alpha))
                 {
                     rootMove.Score = value;
-                    rootMove.SelDepth = selDepth;
+                    rootMove.SelDepth = 0;
                     rootMove.Pv.resize(1);
                     for (Move* m = (stack + 1)->PV; *m != MOVE_NONE; ++m)
                         rootMove.Pv.push_back(*m);
@@ -658,7 +578,7 @@ namespace Storm
             if (value > bestValue)
             {
                 bestValue = value;
-                
+
                 if (value > alpha)
                 {
                     bestMove = move;
@@ -671,11 +591,11 @@ namespace Storm
                         if (!isCaptureOrPromotion)
                         {
                             int16_t historyScore = GetHistoryValue(depth);
-                            UpdateQuietStats(stack, move);
-                            AddToHistory(position, stack, cmhPtr, m_SearchTables.get(), move, historyScore);
+                            UpdateQuietStats(thread, stack, move);
+                            AddToHistory(position, stack, cmhPtr, &thread->Tables, move, historyScore);
 
                             for (int i = 0; i < quietMoveCount; i++)
-                                AddToHistory(position, stack, cmhPtr, m_SearchTables.get(), quietMoves[i], -historyScore);
+                                AddToHistory(position, stack, cmhPtr, &thread->Tables, quietMoves[i], -historyScore);
                         }
                         break;
                     }
@@ -695,18 +615,17 @@ namespace Storm
             return VALUE_DRAW;
         }
 
-        if (!(IsRoot && m_PvIndex != 0))
+        if (!(IsRoot && thread->PvIndex != 0))
             ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply), stack->StaticEvaluation);
-
         return bestValue;
     }
 
-    template<Search::NodeType NT>
-    inline ValueType Search::QuiescenceSearch(Position& position, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode)
+    template<bool IsPvNode>
+    ValueType Search::QuiescenceSearch(Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode)
     {
         STORM_ASSERT(alpha < beta, "Invalid bounds");
         STORM_ASSERT(stack->SkipMove == MOVE_NONE, "Invalid skip move");
-        constexpr bool IsPvNode = NT == PV;
+        Position& position = *thread->Position;
         const bool inCheck = position.InCheck();
 
         StateInfo st;
@@ -747,7 +666,7 @@ namespace Storm
                 stack->StaticEvaluation = ttEntry->GetStaticEvaluation();
             else
                 stack->StaticEvaluation = Evaluate(position);
-                
+
             if (stack->StaticEvaluation >= beta)
                 return stack->StaticEvaluation;
             if (alpha < stack->StaticEvaluation)
@@ -777,25 +696,16 @@ namespace Storm
             if (!position.IsLegal(move))
                 continue;
 
-            moveIndex++;
+            ++moveIndex;
             bool givesCheck = position.GivesCheck(move);
-#if !STORM_USE_UNDO
-            Position movedPosition = position;
-            movedPosition.ApplyMove(move, &undo, givesCheck);
-            m_Nodes++;
-            stack->CurrentMove = move;
-            pv[0] = MOVE_NONE;
-            ValueType value = -QuiescenceSearch<NT>(movedPosition, stack + 1, 0, -beta, -alpha, cutNode);
-#else
             position.ApplyMove(move, st, &undo, givesCheck);
-            m_Nodes++;
+            ++thread->Nodes;
             stack->CurrentMove = move;
             pv[0] = MOVE_NONE;
-            ValueType value = -QuiescenceSearch<NT>(position, stack + 1, 0, -beta, -alpha, cutNode);
+            ValueType value = -QuiescenceSearch<IsPvNode>(thread, stack + 1, 0, -beta, -alpha, cutNode);
             position.UndoMove(move, undo);
-#endif
 
-            if (CheckLimits())
+            if (ShouldStopSearch(thread))
             {
                 m_Stopped = true;
                 return VALUE_NONE;
@@ -824,7 +734,7 @@ namespace Storm
         return bestValue;
     }
 
-    void Search::UpdateQuietStats(SearchStack* stack, Move move)
+    void Search::UpdateQuietStats(Thread* thread, SearchStack* stack, Move move) const
     {
         if (move != stack->Killers[0])
         {
@@ -832,7 +742,7 @@ namespace Storm
             stack->Killers[0] = move;
         }
         if ((stack - 1)->CurrentMove != MOVE_NONE)
-            m_SearchTables->CounterMoves[GetFromSquare((stack - 1)->CurrentMove)][GetToSquare((stack - 1)->CurrentMove)] = move;
+            thread->Tables.CounterMoves[GetFromSquare((stack - 1)->CurrentMove)][GetToSquare((stack - 1)->CurrentMove)] = move;
     }
 
     bool Search::IsDraw(const Position& position, SearchStack* stack) const
@@ -858,20 +768,51 @@ namespace Storm
         return false;
     }
 
-    bool Search::CheckLimits() const
+    bool Search::ShouldStopSearch(Thread* thread) const
     {
         if (m_Limits.Infinite)
             return m_ShouldStop || m_Stopped;
-        if (m_Nodes & 2048)
+        if (thread->Nodes & 2048)
         {
             if (m_TimeManager.IsSearchComplete())
                 return true;
             if (m_Limits.Nodes > 0)
             {
-                return m_Nodes >= m_Limits.Nodes;
+                return thread->Nodes >= m_Limits.Nodes;
             }
         }
         return m_ShouldStop || m_Stopped;
+    }
+
+    void Search::InitTimeManagement(const Position& position)
+    {
+        if (m_Limits.Milliseconds > 0 && !m_Limits.Infinite)
+            m_TimeManager.SetMillisecondsToMove(m_Limits.Milliseconds);
+        else
+        {
+            int colorTime = position.ColorToMove == COLOR_WHITE ? m_Limits.WhiteTime : m_Limits.BlackTime;
+            int colorIncrement = position.ColorToMove == COLOR_WHITE ? m_Limits.WhiteIncrement : m_Limits.BlackIncrement;
+            int allocatedTime = 0;
+
+            if (colorIncrement > 0)
+                allocatedTime = int(colorTime * (1 + position.TotalTurns / 40.0f) / 16 + colorIncrement);
+            if (m_Limits.MovesToGo > 0)
+                allocatedTime = colorTime / (std::min(m_Limits.MovesToGo, 100) + 1) * 3 / 2;
+            else
+                allocatedTime = colorTime / 20;
+
+            m_TimeManager.SetMillisecondsToMove(allocatedTime);
+        }
+        m_TimeManager.StartSearch();
+    }
+
+    void Search::CreateAndInitializeThreads(Position& position, int count)
+    {
+        m_Threads.resize(count);
+        for (int i = 0; i < count; i++)
+        {
+            InitializeThread(position, &m_Threads[i]);
+        }
     }
 
     std::vector<RootMove> Search::GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const
@@ -886,8 +827,8 @@ namespace Storm
             {
                 RootMove mv;
                 mv.Pv = { move };
-                mv.Score = VALUE_DRAW;
-                mv.PreviousScore = VALUE_DRAW;
+                mv.Score = -VALUE_MATE;
+                mv.PreviousScore = -VALUE_MATE;
                 mv.SelDepth = 0;
                 result.push_back(mv);
             }
@@ -895,67 +836,37 @@ namespace Storm
         return result;
     }
 
-    int Search::SelectBestMoveIndex(int multipv, int skillLevel) const
+    void Search::InitializeThread(Position& position, Thread* thread)
     {
-        if (skillLevel == 20 || multipv <= 1)
-            return 0;
-        std::mt19937 engine;
-        engine.seed(time(nullptr));
-
-        ValueType bestScore = m_RootMoves[0].Score;
-        ValueType delta = std::min<ValueType>(bestScore - m_RootMoves[size_t(multipv) - 1].Score, PawnValueEg);
-        ValueType weakness = 120 - 2 * skillLevel;
-        ValueType maxScore = -VALUE_MATE;
-
-        int bestIndex = 0;
-        for (int i = 0; i < multipv; i++)
+        thread->PvBuffer[0] = MOVE_NONE;
+        thread->Nodes = 0;
+        thread->Depth = 1;
+        thread->SelDepth = 0;
+        thread->RootMoves = GenerateRootMoves(position, m_Limits.Only);
+        thread->PositionHistory = std::make_unique<ZobristHash[]>(m_PositionHistory.size() + MAX_PLY + 1);
+        thread->Position = &position;
+        thread->PvIndex = 0;
+        if (!thread->Initialized)
         {
-            std::uniform_int_distribution<ValueType> dist(0, weakness);
-            int push = (weakness * int(bestScore - m_RootMoves[i].Score) + delta * dist(engine)) / 120;
-            if (m_RootMoves[i].Score + push >= maxScore)
-            {
-                maxScore = m_RootMoves[i].Score + push;
-                bestIndex = i;
-            }
+            ClearTable<Move, SQUARE_MAX, SQUARE_MAX>(thread->Tables.CounterMoves, MOVE_NONE);
+            ClearTable<int16_t, COLOR_MAX, SQUARE_MAX, SQUARE_MAX>(thread->Tables.History, 0);
+            ClearTable<int16_t, P_LIMIT, SQUARE_MAX, P_LIMIT* SQUARE_MAX>(thread->Tables.CounterMoveHistory, 0);
+            thread->Initialized = true;
         }
-        return bestIndex;
-    }
-
-    void Search::SetTimeManagementFromLimits(const Position& position, const SearchLimits& limits)
-    {
-        if (m_Limits.Milliseconds > 0 && !m_Limits.Infinite)
-            m_TimeManager.SetMillisecondsToMove(m_Limits.Milliseconds);
-        else
-        {
-            int colorTime = position.ColorToMove == COLOR_WHITE ? limits.WhiteTime : limits.BlackTime;
-            int colorIncrement = position.ColorToMove == COLOR_WHITE ? limits.WhiteIncrement : limits.BlackIncrement;
-            int allocatedTime = 0;
-
-            if (colorIncrement > 0)
-                allocatedTime = int(colorTime * (1 + position.TotalTurns / 40.0f) / 16 + colorIncrement);
-            if (limits.MovesToGo > 0)
-                allocatedTime = colorTime / (std::min(limits.MovesToGo, 100) + 1) * 3 / 2;
-            else
-                allocatedTime = colorTime / 20;
-
-            m_TimeManager.SetMillisecondsToMove(allocatedTime);
-        }
-    }
-
-    SearchStack* Search::InitStack(SearchStack* stack, int count, const Position& position, Move* pv, ZobristHash* history) const
-    {
-        SearchStack* stackPtr = stack;
-        ZobristHash* historyPtr = history;
+        SearchStack* stackPtr = thread->Stack;
+        ZobristHash* historyPtr = thread->PositionHistory.get();
 
         for (int i = 0; i < m_PositionHistory.size(); i++)
         {
             *historyPtr++ = m_PositionHistory[i];
         }
 
+        constexpr int count = Thread::StackOffset + 1;
+
         for (int i = 0; i < count; i++)
         {
             stackPtr->Ply = -count + i + 1;
-            stackPtr->PV = pv;
+            stackPtr->PV = thread->PvBuffer;
             stackPtr->Killers[0] = stackPtr->Killers[1] = MOVE_NONE;
             stackPtr->CurrentMove = MOVE_NONE;
             stackPtr->StaticEvaluation = VALUE_NONE;
@@ -966,7 +877,6 @@ namespace Storm
             stackPtr++;
         }
         stackPtr->Killers[0] = stackPtr->Killers[1] = MOVE_NONE;
-        return stackPtr - 1;
     }
 
 }

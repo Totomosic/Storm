@@ -679,6 +679,17 @@ namespace Storm
 		return bool(res);
 	}
 
+	void Position::AddPiece(ColorPiece piece, SquareIndex square)
+	{
+		AddPiece(ColorOf(piece), TypeOf(piece), square);
+	}
+
+	void Position::RemovePiece(SquareIndex square)
+	{
+		ColorPiece piece = GetPieceOnSquare(square);
+		RemovePiece(ColorOf(piece), TypeOf(piece), square);
+	}
+
 	void Position::MovePiece(Color color, Piece piece, SquareIndex from, SquareIndex to)
 	{
 		const BitBoard mask = from | to;

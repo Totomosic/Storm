@@ -171,6 +171,7 @@ namespace Storm
 	void EvaluateSpace(const Position& position, EvaluationResult& result, const EvaluationData& data);
 
 	std::string FormatEvaluation(const EvaluationResult& result);
+	std::string FormatNNUEEvaluation(Position& position);
 
 	inline bool InsufficientMaterial(const Position& position)
 	{

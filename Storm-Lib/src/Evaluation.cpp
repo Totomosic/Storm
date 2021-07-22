@@ -1,8 +1,10 @@
 #include "Evaluation.h"
 #include "Attacks.h"
+#include "Format.h"
 
 #include "nnue/evaluate_nnue.h"
 #include <fstream>
+#include <filesystem>
 
 namespace Storm
 {
@@ -31,9 +33,35 @@ namespace Storm
 	{
 		InitPassedPawnMasks();
 
-		std::ifstream stream(evalFilename, std::ios::binary);
-		if (NNUE::load_eval(evalFilename, stream))
-			std::cout << "Loaded network " << evalFilename << std::endl;
+		std::string networkFilename = "";
+		bool networkLoaded = false;
+		if (!evalFilename.empty())
+		{
+			std::ifstream stream(evalFilename, std::ios::binary);
+			networkLoaded = NNUE::load_eval(evalFilename, stream);
+			if (networkLoaded)
+				networkFilename = evalFilename;
+		}
+		if (!networkLoaded)
+		{
+			for (auto entry : std::filesystem::directory_iterator("."))
+			{
+				if (entry.is_regular_file() && entry.path().extension() == ".nnue")
+				{
+					std::ifstream stream(entry.path().string(), std::ios::binary);
+					networkLoaded = NNUE::load_eval(entry.path().string(), stream);
+					if (networkLoaded)
+					{
+						networkFilename = entry.path().string();
+						break;
+					}
+				}
+			}
+		}
+		if (networkLoaded)
+			std::cout << "Loaded network " << networkFilename << std::endl;
+		else
+			std::cout << "Failed to load NNUE parameters" << std::endl;
 	}
 
 	template<Color C>
@@ -479,5 +507,91 @@ namespace Storm
 		format += "Total evaluation: " + std::to_string(result.Result(COLOR_WHITE)) + " (white side)";
 		return format;
 #undef FORMAT_TABLE_ROW
+	}
+
+	std::string FormatNNUEEvaluation(Position& position)
+	{
+		auto formatCp = [](ValueType cp)
+		{
+			std::string buffer = "     ";
+			buffer[0] = (cp < 0 ? '-' : cp > 0 ? '+' : ' ');
+			cp = std::abs(cp * 100 / 130);
+
+			if (cp >= 10000)
+			{
+				buffer[1] = '0' + cp / 10000; cp %= 10000;
+				buffer[2] = '0' + cp / 1000; cp %= 1000;
+				buffer[3] = '0' + cp / 100; cp %= 100;
+				buffer[4] = ' ';
+			}
+			else if (cp >= 1000)
+			{
+				buffer[1] = '0' + cp / 1000; cp %= 1000;
+				buffer[2] = '0' + cp / 100; cp %= 100;
+				buffer[3] = '.';
+				buffer[4] = '0' + cp / 10;
+			}
+			else
+			{
+				buffer[1] = '0' + cp / 100; cp %= 100;
+				buffer[2] = '.';
+				buffer[3] = '0' + cp / 10; cp %= 10;
+				buffer[4] = '0' + cp / 1;
+			}
+			return buffer;
+		};
+
+		ValueType baseEval = Evaluate(position);
+
+		std::stringstream ss;
+		for (Rank rank = RANK_8; rank >= RANK_1; rank--)
+		{
+			for (File file = FILE_A; file < FILE_MAX; file++)
+			{
+				ss << "+-------";
+			}
+			ss << "+\n";
+			for (File file = FILE_A; file < FILE_MAX; file++)
+			{
+				ColorPiece piece = position.GetPieceOnSquare(CreateSquare(file, rank));
+				char c = piece == COLOR_PIECE_NONE ? ' ' : UCI::PieceToString(TypeOf(piece), ColorOf(piece));
+				ss << "|   " << c << "   ";
+			}
+			ss << "|\n";
+			for (File file = FILE_A; file < FILE_MAX; file++)
+			{
+				ss << "| ";
+				SquareIndex square = CreateSquare(file, rank);
+				ColorPiece piece = position.GetPieceOnSquare(square);
+				if (piece != COLOR_PIECE_NONE && TypeOf(piece) != PIECE_KING)
+				{
+					position.RemovePiece(square);
+					position.GetState()->Accumulator.computed[COLOR_WHITE] = false;
+					position.GetState()->Accumulator.computed[COLOR_BLACK] = false;
+
+					ValueType eval = Evaluate(position);
+					eval = position.ColorToMove == COLOR_WHITE ? eval : -eval;
+					ValueType pieceValue = baseEval - eval;
+
+					position.AddPiece(piece, square);
+					position.GetState()->Accumulator.computed[COLOR_WHITE] = false;
+					position.GetState()->Accumulator.computed[COLOR_BLACK] = false;
+					ss << formatCp(pieceValue);
+				}
+				else
+				{
+					ss << "     ";
+				}
+
+				ss << " ";
+			}
+			ss << "|\n";
+		}
+		for (File file = FILE_A; file < FILE_MAX; file++)
+		{
+			ss << "+-------";
+		}
+		ss << "+";
+		return ss.str();
 	}
 }
