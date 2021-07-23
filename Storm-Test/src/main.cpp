@@ -81,7 +81,7 @@ namespace Test
 	{
 		Init();
 		Position position = CreateStartingPosition();
-		Search search(50 * 1024 * 1024, false);
+		Search search;
 
 		size_t checks = 0;
 

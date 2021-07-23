@@ -6,7 +6,7 @@
 namespace Storm
 {
 
-	constexpr ValueType StaticEvalLimits = 3000;
+	constexpr ValueType StaticEvalLimits = 4000;
 
 	STORM_API enum EntryBound : uint8_t
 	{
@@ -30,15 +30,16 @@ namespace Storm
 		// Mask out 3 most signficant bits
 		inline ValueType GetValue() const { return int((m_ValueAndBound >> 13) & 0xFFFF) + VALUE_NONE; }
 		inline ValueType GetStaticEvaluation() const { return int(m_ValueAndBound & 0x1FFF) - StaticEvalLimits; }
-		inline EntryBound GetBound() const { return EntryBound(m_ValueAndBound >> 29); }
+		inline EntryBound GetBound() const { return EntryBound((m_ValueAndBound >> 29) & 0x3); }
 
 		inline void Update(ZobristHash hash, Move move, int depth, EntryBound bound, ValueType value, ValueType staticEval)
 		{
 			STORM_ASSERT(value >= VALUE_NONE, "Invalid Value");
-			if (move != MOVE_NONE || hash != m_Hash)
+			if (move != MOVE_NONE && m_Move == MOVE_NONE)
 				m_Move = move;
-			if (bound == BOUND_EXACT || hash != m_Hash || depth > m_Depth - 4)
+			if (bound == BOUND_EXACT || hash != m_Hash || depth * 2 >= m_Depth)
 			{
+				m_Move = move;
 				m_Hash = hash;
 				m_Depth = depth;
 				m_ValueAndBound = (uint32_t(bound) << 29) | ((uint32_t(value - VALUE_NONE) & 0xFFFF) << 13) | (uint32_t(std::clamp(staticEval, ValueType(-StaticEvalLimits), StaticEvalLimits) + StaticEvalLimits) & 0x1FFF);
@@ -69,7 +70,24 @@ namespace Storm
 		inline size_t HashToIndex(uint64_t hash) const
 		{
 			STORM_ASSERT((hash & m_Mask) < m_EntryCount, "Invalid index");
-			return hash & m_Mask;
+			return ((uint32_t)hash * (uint64_t)m_EntryCount) >> 32;
+			// return hash & m_Mask;
+		}
+
+		inline int HashFull() const
+		{
+			int used = 0;
+			const int samples = 1000;
+
+			for (int i = 0; i < samples; ++i)
+			{
+				if (m_Entries[i].GetMove() != MOVE_NONE)
+				{
+					used++;
+				}
+			}
+
+			return used / (samples / 1000);
 		}
 
 	};

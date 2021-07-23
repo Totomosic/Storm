@@ -6,7 +6,6 @@
 #include "Move.h"
 #include "MoveGeneration.h"
 #include "Position.h"
-#include "Search.h"
 #include "SearchThread.h"
 #include "Book.h"
 

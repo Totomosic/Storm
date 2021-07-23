@@ -1,6 +1,4 @@
 #pragma once
-#define NEW_SEARCH 1
-#if NEW_SEARCH
 #include "EvalConstants.h"
 #include "Evaluation.h"
 #include "Format.h"
@@ -26,6 +24,7 @@ namespace Storm
 		int Depth = 0;
 		int SelDepth = 0;
 		int PvIndex = 0;
+		int BestMoveChanges = 0;
 		std::vector<RootMove> RootMoves;
 		SearchTables Tables;
 		Storm::Position* Position;
@@ -103,6 +102,7 @@ namespace Storm
 		bool IsDraw(const Position& position, SearchStack* stack) const;
 		bool ShouldStopSearch(Thread* thread) const;
 		std::vector<RootMove> GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const;
+		int SelectBestMoveIndex(Thread* thread, int multipv, int skillLevel) const;
 		void InitTimeManagement(const Position& position);
 		void CreateAndInitializeThreads(Position& position, int count);
 		void InitializeThread(Position& position, Thread* thread);
@@ -110,4 +110,3 @@ namespace Storm
 
 	void InitSearch();
 }
-#endif

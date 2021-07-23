@@ -15,6 +15,19 @@ namespace Storm
 	uint64_t s_CastlingRights[4];
 	uint64_t s_EnPassantFile[FILE_MAX];
 
+	static uint64_t Rand64() {
+
+		// http://vigna.di.unimi.it/ftp/papers/xorshift.pdf
+
+		static uint64_t seed = 1070372ull;
+
+		seed ^= seed >> 12;
+		seed ^= seed << 25;
+		seed ^= seed >> 27;
+
+		return seed * 2685821657736338717ull;
+	}
+
 	void InitZobristHash()
 	{
 		if (!s_Initialized)
@@ -27,36 +40,21 @@ namespace Storm
 			{
 				for (SquareIndex index = a1; index < SQUARE_MAX; index++)
 				{
-					s_PieceOnSquare[COLOR_WHITE][piece][index] = dist(mt);
-					s_PieceOnSquare[COLOR_BLACK][piece][index] = dist(mt);
+					s_PieceOnSquare[COLOR_WHITE][piece][index] = Rand64();
+					s_PieceOnSquare[COLOR_BLACK][piece][index] = Rand64();
 				}
 			}
-			s_BlackToMove = dist(mt);
-			s_CastlingRights[0] = dist(mt);
-			s_CastlingRights[1] = dist(mt);
-			s_CastlingRights[2] = dist(mt);
-			s_CastlingRights[3] = dist(mt);
+			s_BlackToMove = Rand64();
+			s_CastlingRights[0] = Rand64();
+			s_CastlingRights[1] = Rand64();
+			s_CastlingRights[2] = Rand64();
+			s_CastlingRights[3] = Rand64();
 			for (File file = FILE_A; file < FILE_MAX; file++)
 			{
-				s_EnPassantFile[file] = dist(mt);
+				s_EnPassantFile[file] = Rand64();
 			}
 			s_Initialized = true;
 		}
-	}
-
-	ZobristHash operator^(const ZobristHash& left, const ZobristHash& right)
-	{
-		return left.Hash ^ right.Hash;
-	}
-
-	bool operator==(const ZobristHash& left, const ZobristHash& right)
-	{
-		return left.Hash == right.Hash;
-	}
-
-	bool operator!=(const ZobristHash& left, const ZobristHash& right)
-	{
-		return left.Hash != right.Hash;
 	}
 
 	ZobristHash::ZobristHash()
@@ -103,63 +101,6 @@ namespace Storm
 			AddCastleKingside(COLOR_BLACK);
 		if (position.Colors[COLOR_BLACK].CastleQueenSide)
 			AddCastleQueenside(COLOR_BLACK);
-	}
-
-	void ZobristHash::RemovePieceAt(Color color, Piece piece, SquareIndex square)
-	{
-		Hash ^= s_PieceOnSquare[color][piece][square];
-	}
-
-	void ZobristHash::AddPieceAt(Color color, Piece piece, SquareIndex square)
-	{
-		Hash ^= s_PieceOnSquare[color][piece][square];
-	}
-
-	void ZobristHash::FlipTeamToPlay()
-	{
-		Hash ^= s_BlackToMove;
-	}
-
-	void ZobristHash::RemoveEnPassant(File file)
-	{
-		Hash ^= s_EnPassantFile[file];
-	}
-
-	void ZobristHash::AddEnPassant(File file)
-	{
-		Hash ^= s_EnPassantFile[file];
-	}
-
-	void ZobristHash::AddCastleKingside(Color color)
-	{
-		if (color == COLOR_WHITE)
-			Hash ^= s_CastlingRights[0];
-		else
-			Hash ^= s_CastlingRights[2];
-	}
-
-	void ZobristHash::AddCastleQueenside(Color color)
-	{
-		if (color == COLOR_WHITE)
-			Hash ^= s_CastlingRights[1];
-		else
-			Hash ^= s_CastlingRights[3];
-	}
-
-	void ZobristHash::RemoveCastleKingside(Color color)
-	{
-		AddCastleKingside(color);
-	}
-
-	void ZobristHash::RemoveCastleQueenside(Color color)
-	{
-		AddCastleQueenside(color);
-	}
-
-	ZobristHash& ZobristHash::operator^=(const ZobristHash& right)
-	{
-		Hash ^= right.Hash;
-		return *this;
 	}
 
 }

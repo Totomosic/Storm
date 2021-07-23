@@ -1,6 +1,5 @@
 #include "SearchThread.h"
-
-#if NEW_SEARCH
+#include <random>
 
 namespace Storm
 {
@@ -49,7 +48,7 @@ namespace Storm
     }
 
     Search::Search()
-        : m_TimeManager(), m_TranspositionTable(128 * 1024 * 1024), m_Limits(), m_ShouldStop(false), m_Stopped(false), m_Threads()
+        : m_TimeManager(), m_TranspositionTable(32 * 1024 * 1024), m_Limits(), m_ShouldStop(false), m_Stopped(false), m_Threads()
     {
     }
 
@@ -148,11 +147,12 @@ namespace Storm
         Move bestMove = MOVE_NONE;
         Move ponderMove = MOVE_NONE;
         Thread& mainThread = m_Threads[0];
-        if (mainThread.RootMoves.size() > 1)
+        if (mainThread.RootMoves.size() >= 1)
         {
-            bestMove = mainThread.RootMoves[0].Pv[0];
-            if (mainThread.RootMoves[0].Pv.size() > 1)
-                ponderMove = mainThread.RootMoves[0].Pv[1];
+            int bestIndex = SelectBestMoveIndex(&mainThread, mainThread.RootMoves.size(), m_Settings.SkillLevel);
+            bestMove = mainThread.RootMoves[bestIndex].Pv[0];
+            if (mainThread.RootMoves[bestIndex].Pv.size() > 1)
+                ponderMove = mainThread.RootMoves[bestIndex].Pv[1];
         }
         return { bestMove, ponderMove };
     }
@@ -162,9 +162,16 @@ namespace Storm
         SearchStack* stack = thread->Stack + Thread::StackOffset;
         bool isMainThread = true;
 
+        int multipv = std::clamp(m_Settings.MultiPv, GetMultiPv(m_Settings.SkillLevel), std::min(20, (int)thread->RootMoves.size()));
+
+        int depthSinceMoveChange = 0;
+        float evalAverage = 0;
+
         while (thread->Depth <= maxDepth)
         {
-            for (int i = 0; i < std::clamp(m_Settings.MultiPv, 1, std::min(20, (int)thread->RootMoves.size())); i++)
+            m_TimeManager.StartNewDepth();
+            thread->BestMoveChanges /= 2;
+            for (int i = 0; i < multipv; i++)
             {
                 thread->PvIndex = i;
                 thread->SelDepth = 0;
@@ -183,6 +190,32 @@ namespace Storm
             for (RootMove& mv : thread->RootMoves)
                 mv.PreviousScore = mv.Score;
             std::stable_sort(thread->RootMoves.begin(), thread->RootMoves.end());
+
+            // If playing a match, break if only one legal move
+            if (thread->RootMoves.size() == 1 && (m_Limits.WhiteTime > 0 || m_Limits.BlackTime > 0))
+                break;
+
+            if (m_Limits.WhiteTime > 0 || m_Limits.BlackTime > 0)
+            {
+                int64_t depthTime = m_TimeManager.ElapsedMs();
+                if (m_TimeManager.RemainingAllocatedTime() < depthTime && !m_Limits.Infinite)
+                    break;
+
+                evalAverage += (thread->RootMoves[0].Score - evalAverage) * (thread->Depth < 8 ? 1.0f : 0.1f);
+             
+                if (thread->BestMoveChanges == 0)
+                    depthSinceMoveChange++;
+                else
+                    depthSinceMoveChange = 0;
+
+                double extension = 1.0 + std::max(0.0, (evalAverage - thread->RootMoves[0].Score) / 70.0);
+                double instability = 1.0 + std::max(1.0, 2.0 - 10.0 / thread->Depth) * thread->BestMoveChanges;
+                double reduction = 1.0 - std::min(0.75, depthSinceMoveChange * depthSinceMoveChange / 1400.0);
+                double multiplier = instability * reduction * extension;
+                m_TimeManager.SetAllocatedTimeMultiplier(multiplier);
+
+                // std::cout << m_TimeManager.RemainingAllocatedTime() / 1000 << " " << extension << std::endl;
+            }
 
             thread->Depth++;
         }
@@ -214,7 +247,7 @@ namespace Storm
             if (ShouldStopSearch(thread))
                 break;
 
-            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000))
+            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000) && thread->PvIndex < m_Settings.MultiPv)
             {
                 RootMove& bestMove = thread->RootMoves[thread->PvIndex];
                 std::cout << "info depth " << depth << " seldepth " << thread->SelDepth << " score ";
@@ -234,7 +267,7 @@ namespace Storm
                 else if (bestMove.Score >= beta)
                     std::cout << " lowerbound";
                 std::cout << " nodes " << thread->Nodes << " nps " << size_t(thread->Nodes * 1000 / (m_TimeManager.TotalElapsedMs() + 1));
-                std::cout << " time " << m_TimeManager.TotalElapsedMs() << " multipv " << thread->PvIndex + 1;
+                std::cout << " time " << m_TimeManager.TotalElapsedMs() << " hashfull " << m_TranspositionTable.HashFull() << " multipv " << thread->PvIndex + 1;
                 std::cout << " pv";
                 for (Move mv : bestMove.Pv)
                     std::cout << " " << UCI::FormatMove(mv);
@@ -322,9 +355,7 @@ namespace Storm
         TranspositionTableEntry* ttEntry = nullptr;
         if (stack->SkipMove != MOVE_NONE)
         {
-            ttHash ^= stack->SkipMove;
-            STORM_ASSERT(ttHash != position.Hash, "Invalid hash");
-            STORM_ASSERT(m_TranspositionTable.HashToIndex(ttHash.Hash) != m_TranspositionTable.HashToIndex(position.Hash.Hash), "Invalid hash");
+            ttHash ^= uint64_t(stack->SkipMove) << 32;
         }
         ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
 
@@ -570,6 +601,8 @@ namespace Storm
                     rootMove.Pv.resize(1);
                     for (Move* m = (stack + 1)->PV; *m != MOVE_NONE; ++m)
                         rootMove.Pv.push_back(*m);
+                    if (moveIndex > FirstMoveIndex)
+                        thread->BestMoveChanges++;
                 }
                 else
                     rootMove.Score = -VALUE_MATE;
@@ -578,7 +611,6 @@ namespace Storm
             if (value > bestValue)
             {
                 bestValue = value;
-
                 if (value > alpha)
                 {
                     bestMove = move;
@@ -615,7 +647,7 @@ namespace Storm
             return VALUE_DRAW;
         }
 
-        if (!(IsRoot && thread->PvIndex != 0))
+        if (stack->SkipMove == MOVE_NONE)
             ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply), stack->StaticEvaluation);
         return bestValue;
     }
@@ -784,10 +816,39 @@ namespace Storm
         return m_ShouldStop || m_Stopped;
     }
 
+    int Search::SelectBestMoveIndex(Thread* thread, int multipv, int skillLevel) const
+    {
+        if (skillLevel == 20 || multipv <= 1)
+            return 0;
+        std::mt19937 engine;
+        engine.seed(time(nullptr));
+
+        ValueType bestScore = thread->RootMoves[0].Score;
+        ValueType delta = std::min<ValueType>(bestScore - thread->RootMoves[size_t(multipv) - 1].Score, PawnValueEg);
+        ValueType weakness = 120 - 2 * skillLevel;
+        ValueType maxScore = -VALUE_MATE;
+
+        int bestIndex = 0;
+        for (int i = 0; i < multipv; i++)
+        {
+            std::uniform_int_distribution<ValueType> dist(0, weakness);
+            int push = (weakness * int(bestScore - thread->RootMoves[i].Score) + delta * dist(engine)) / 120;
+            if (thread->RootMoves[i].Score + push >= maxScore)
+            {
+                maxScore = thread->RootMoves[i].Score + push;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
     void Search::InitTimeManagement(const Position& position)
     {
         if (m_Limits.Milliseconds > 0 && !m_Limits.Infinite)
-            m_TimeManager.SetMillisecondsToMove(m_Limits.Milliseconds);
+        {
+            m_TimeManager.SetOptimalTime(m_Limits.Milliseconds);
+            m_TimeManager.SetMaxTime(m_Limits.Milliseconds);
+        }
         else
         {
             int colorTime = position.ColorToMove == COLOR_WHITE ? m_Limits.WhiteTime : m_Limits.BlackTime;
@@ -801,7 +862,8 @@ namespace Storm
             else
                 allocatedTime = colorTime / 20;
 
-            m_TimeManager.SetMillisecondsToMove(allocatedTime);
+            m_TimeManager.SetOptimalTime(allocatedTime);
+            m_TimeManager.SetMaxTime(colorTime);
         }
         m_TimeManager.StartSearch();
     }
@@ -880,4 +942,3 @@ namespace Storm
     }
 
 }
-#endif
