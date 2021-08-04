@@ -37,7 +37,7 @@ namespace Storm
 			STORM_ASSERT(value >= VALUE_NONE, "Invalid Value");
 			if (move != MOVE_NONE && m_Move == MOVE_NONE)
 				m_Move = move;
-			if (bound == BOUND_EXACT || hash != m_Hash || depth * 2 >= m_Depth)
+			if ((bound == BOUND_EXACT && GetBound() != BOUND_EXACT) || hash != m_Hash || depth * 2 >= m_Depth)
 			{
 				m_Move = move;
 				m_Hash = hash;
@@ -69,7 +69,8 @@ namespace Storm
 
 		inline size_t HashToIndex(uint64_t hash) const
 		{
-			STORM_ASSERT((hash & m_Mask) < m_EntryCount, "Invalid index");
+			// STORM_ASSERT((hash & m_Mask) < m_EntryCount, "Invalid index");
+			STORM_ASSERT(((uint32_t)hash * (uint64_t)m_EntryCount) >> 32 < m_EntryCount, "Invalid Index");
 			return ((uint32_t)hash * (uint64_t)m_EntryCount) >> 32;
 			// return hash & m_Mask;
 		}

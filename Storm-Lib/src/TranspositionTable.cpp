@@ -20,6 +20,7 @@ namespace Storm
 			m_Mask = ret - 1;
 			m_EntryCount = m_Mask + 1;
 			m_Entries = std::make_unique<TranspositionTableEntry[]>(m_EntryCount);
+			std::memset(m_Entries.get(), 0, m_EntryCount * sizeof(TranspositionTableEntry));
 		}
 	}
 

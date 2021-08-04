@@ -270,6 +270,10 @@ namespace Storm
 		{
 			m_Settings.SkillLevel = std::min(std::max(0, std::stoi(*value)), 20);
 		}
+		if (name == "threads" && value != nullptr)
+		{
+			m_Settings.Threads = std::min(std::max(1, std::stoi(*value)), 256);
+		}
 		/*if (name == "book")
 		{
 			m_OpeningBook.Clear();

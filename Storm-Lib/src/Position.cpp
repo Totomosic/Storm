@@ -423,6 +423,11 @@ namespace Storm
 
 	bool Position::IsPseudoLegal(Move move) const
 	{
+		ColorPiece piece = GetPieceOnSquare(GetFromSquare(move));
+		if (piece == COLOR_PIECE_NONE)
+			return false;
+		if (ColorOf(piece) != ColorToMove)
+			return false;
 		return true;
 	}
 

@@ -27,6 +27,7 @@ namespace Storm
 		inline void SetOptimalTime(size_t milliseconds) { m_Milliseconds = int64_t(milliseconds); }
 		inline void SetMaxTime(size_t milliseconds) { m_MaxTime = milliseconds; }
 		inline void SetAllocatedTimeMultiplier(float multiplier) { m_AllocatedTimeMultiplier = multiplier; }
+		inline size_t GetMaxTime() const { return m_MaxTime; }
 
 		void StartSearch();
 		void StartNewDepth();

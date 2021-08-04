@@ -172,9 +172,9 @@ namespace Storm::NNUE {
 
     int sum = (A * materialist + B * positional) / 128;
 
-    // int scale = 900 + 32 * Popcount(pos.GetPieces(PIECE_PAWN)) + 32 * pos.GetNonPawnMaterial() / 512;
+    int scale = 900 + 32 * Popcount(pos.GetPieces(PIECE_PAWN)) + 32 * pos.GetNonPawnMaterial() / 512;
 
-    return static_cast<ValueType>( sum / OutputScale ) * 130 / 208;
+    return static_cast<ValueType>( sum / OutputScale ) * 100 * scale / 1024 / 208;
   }
 
   // Load eval, from a file stream or a memory stream

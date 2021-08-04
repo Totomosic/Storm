@@ -17,17 +17,22 @@ namespace Storm
 		static constexpr int StackOffset = 4;
 	public:
 		bool Initialized = false;
-		SearchStack Stack[MAX_PLY + StackOffset];
-		Move PvBuffer[MAX_PLY];
+		SearchStack Stack[MAX_PLY + StackOffset + 1];
+		Move PvBuffer[MAX_PLY + 1];
 		std::unique_ptr<ZobristHash[]> PositionHistory = nullptr;
 		size_t Nodes = 0;
 		int Depth = 0;
 		int SelDepth = 0;
 		int PvIndex = 0;
 		int BestMoveChanges = 0;
+		int ThreadIndex = 0;
 		std::vector<RootMove> RootMoves;
 		SearchTables Tables;
-		Storm::Position* Position;
+		StateInfo RootStateInfo;
+		Storm::Position Position;
+
+	public:
+		inline bool IsMain() const { return ThreadIndex == 0; }
 	};
 
 	constexpr ValueType GetValueForTT(ValueType value, int ply)
@@ -45,6 +50,7 @@ namespace Storm
 	public:
 		int MultiPv = 1;
 		int SkillLevel = 20;
+		int Threads = 1;
 	};
 
 	struct STORM_API SearchResult
@@ -105,7 +111,17 @@ namespace Storm
 		int SelectBestMoveIndex(Thread* thread, int multipv, int skillLevel) const;
 		void InitTimeManagement(const Position& position);
 		void CreateAndInitializeThreads(Position& position, int count);
-		void InitializeThread(Position& position, Thread* thread);
+		void InitializeThread(Position& position, Thread* thread, int index);
+
+		inline size_t GetTotalNodes() const
+		{
+			size_t count = 0;
+			for (const Thread& thread : m_Threads)
+			{
+				count += thread.Nodes;
+			}
+			return count;
+		}
 	};
 
 	void InitSearch();
