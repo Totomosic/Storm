@@ -39,7 +39,7 @@ namespace Storm
 		inline int64_t RemainingAllocatedTime() const { return GetAdjustedAllocatedTime() - TotalElapsedMs() - MoveOverheadBufferMS; }
 
 	private:
-		inline size_t GetAdjustedAllocatedTime() const { return std::clamp(size_t(m_AllocatedTime * m_AllocatedTimeMultiplier), 0ULL, m_MaxTime); }
+		inline size_t GetAdjustedAllocatedTime() const { return std::clamp(size_t(m_AllocatedTime * m_AllocatedTimeMultiplier), size_t(0ULL), m_MaxTime); }
 	};
 
 }

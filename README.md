@@ -2,7 +2,11 @@
 C++ UCI Chess engine inspired by [Stockfish](https://stockfishchess.org/).
 Created using ideas learned during the development of [Boxfish](https://github.com/Totomosic/Boxfish).
 
-Example of the engine running [here](https://totomosic.github.io). (built to WebAssembly with Emscripten)
+Example of the engine running [here](https://totomosic.github.io). (built to WebAssembly with Emscripten - slightly older version)
+
+Storm currently uses the same NNUE as Stockfish (future plans to train network independently).
+For now you should download a network from [https://tests.stockfishchess.org/nns](https://tests.stockfishchess.org/nns) and copy it into the working directory
+before you run the program.
 
 ## Features
 - Bitboards and magic bitboard move generation
@@ -16,11 +20,7 @@ Example of the engine running [here](https://totomosic.github.io). (built to Web
   - Futility pruning
   - Late move reduction
 - Evaluation:
-  - Material
-  - Piece squares
-  - King safety
-  - Space
-  - Knights, Bishops, Rooks, Queens
+  - NNUE
 - All perft tests passed
 - Pondering
 - SEE move ordering
@@ -28,6 +28,7 @@ Example of the engine running [here](https://totomosic.github.io). (built to Web
 ## Installing:
 1. Download or clone this repository (use flag `--recurse-submodules` or `--recursive` to include submodules).
 2. If on windows run the `Scripts/Win-GenProjects.bat` script to generate the Visual Studio 2019 project and solution files.
+3. Download a NNUE from [here](https://tests.stockfishchess.org/nns) and copy into working directory.
 
 ## Building on Windows:
 1. Run `Scripts/Win-GenProjects.bat` and build the solution using Visual Studio 2019.
