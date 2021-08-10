@@ -51,6 +51,7 @@ namespace Storm
 		int MultiPv = 1;
 		int SkillLevel = 20;
 		int Threads = 1;
+		size_t HashBytes = 0;
 	};
 
 	struct STORM_API SearchResult
@@ -85,6 +86,8 @@ namespace Storm
 
 	public:
 		Search();
+
+		inline TranspositionTable& GetTranspositionTable() { return m_TranspositionTable; }
 
 		inline void SetSettings(const SearchSettings& settings) { m_Settings = settings; }
 		void PushPosition(const ZobristHash& hash);

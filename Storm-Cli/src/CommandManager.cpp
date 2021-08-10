@@ -193,6 +193,10 @@ namespace Storm
 		std::cout << "\t\tInstructs the engine to report the top <count> best moves. For best performance set this to 1." << std::endl;
 		std::cout << "\t* Skill Level <level>" << std::endl;
 		std::cout << "\t\tAn integer between 1-20 indicating the skill level the engine should play at. (default 20)" << std::endl;
+		std::cout << "\t* Threads" << std::endl;
+		std::cout << "\t\tNumber of threads to use during search, for best performance set to the number of CPU cores available. (default 1)" << std::endl;
+		std::cout << "\t* Hash" << std::endl;
+		std::cout << "\t\tSize of the hash table in MB. (default 32)" << std::endl;
 		std::cout << "* d" << std::endl;
 		std::cout << "\tPrint the current position." << std::endl;
 		std::cout << "* position [fen <fenstring> | startpos] [moves <moves>...]" << std::endl;
@@ -239,6 +243,8 @@ namespace Storm
 		std::cout << "id author Jordan Morrison" << std::endl;
 		std::cout << "option name MultiPV type spin default 1 min 1 max 100" << std::endl;
 		std::cout << "option name Skill Level type spin default 20 min 1 max 20" << std::endl;
+		std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
+		std::cout << "option name Hash type spin default 32 min 1 max 262144" << std::endl;
 
 		std::cout << "uciok" << std::endl;
 	}
@@ -275,6 +281,10 @@ namespace Storm
 		if (name == "threads" && value != nullptr)
 		{
 			m_Settings.Threads = std::min(std::max(1, std::stoi(*value)), 256);
+		}
+		if (name == "hash" && value != nullptr)
+		{
+			m_Settings.HashBytes = size_t(std::stoi(*value)) * 1024ULL * 1024ULL;
 		}
 		/*if (name == "book")
 		{

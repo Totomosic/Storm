@@ -50,7 +50,7 @@ namespace Storm
 	class STORM_API TranspositionTable
 	{
 	public:
-		static constexpr size_t DEFAULT_TABLE_SIZE = 50 * 1024 * 1024;
+		static constexpr size_t DEFAULT_TABLE_SIZE = 32 * 1024 * 1024;
 
 	private:
 		std::unique_ptr<TranspositionTableEntry[]> m_Entries;
@@ -59,6 +59,8 @@ namespace Storm
 
 	public:
 		TranspositionTable(size_t bytes = DEFAULT_TABLE_SIZE);
+
+		bool IsSameSize(size_t bytes) const;
 
 		inline TranspositionTableEntry* GetEntry(const ZobristHash& hash, bool& found) const
 		{
@@ -79,7 +81,6 @@ namespace Storm
 		{
 			int used = 0;
 			const int samples = 1000;
-
 			for (int i = 0; i < samples; ++i)
 			{
 				if (m_Entries[i].GetMove() != MOVE_NONE)
@@ -87,10 +88,14 @@ namespace Storm
 					used++;
 				}
 			}
-
 			return used / (samples / 1000);
 		}
 
+		void SetSize(size_t bytes);
+		void Clear();
+
+	private:
+		size_t CalculateEntryCount(size_t bytes) const;
 	};
 
 }
