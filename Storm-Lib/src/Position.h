@@ -7,6 +7,11 @@
 
 #include "nnue/nnue_accumulator.h"
 
+#ifdef SWIG
+#define STORM_API
+#define ValueType int16_t
+#endif
+
 namespace Storm
 {
 
@@ -172,5 +177,18 @@ namespace Storm
 
 	std::string FormatPosition(const Position& position);
 	std::ostream& operator<<(std::ostream& stream, const Position& position);
+
+	// Utility library methods
+
+	std::vector<Move> GetLegalMoves(const Position& position);
+	inline bool IsLegalMove(Move move, const std::vector<Move>& legalMoves)
+	{
+		for (Move mv : legalMoves)
+		{
+			if (mv == move)
+				return true;
+		}
+		return false;
+	}
 
 }

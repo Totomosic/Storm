@@ -4,6 +4,11 @@
 #include "SearchConstants.h"
 #include "SearchData.h"
 
+#ifdef SWIG
+#define STORM_API
+#define ValueType int16_t
+#endif
+
 namespace Storm
 {
 

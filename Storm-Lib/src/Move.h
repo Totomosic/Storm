@@ -1,5 +1,11 @@
 #pragma once
 #include "Types.h"
+#include <unordered_set>
+
+#ifdef SWIG
+#define STORM_API
+#define ValueType int16_t
+#endif
 
 namespace Storm
 {
@@ -53,5 +59,22 @@ namespace Storm
 	{
 		return GetFromSquare(move) != GetToSquare(move);
 	}
+
+	constexpr int InvalidLimit = -1;
+
+	struct STORM_API SearchLimits
+	{
+	public:
+		bool Infinite = false;
+		int Depth = InvalidLimit;
+		int Milliseconds = InvalidLimit;
+		int Nodes = InvalidLimit;
+		int WhiteTime = InvalidLimit;
+		int BlackTime = InvalidLimit;
+		int WhiteIncrement = InvalidLimit;
+		int BlackIncrement = InvalidLimit;
+		int MovesToGo = InvalidLimit;
+		std::unordered_set<Move> Only = {};
+	};
 
 }

@@ -3,6 +3,11 @@
 #include "Move.h"
 #include "ZobristHash.h"
 
+#ifdef SWIG
+#define STORM_API
+#define ValueType int16_t
+#endif
+
 namespace Storm
 {
 

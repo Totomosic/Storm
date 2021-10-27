@@ -11,6 +11,7 @@ Web/
 Makefile
 Scripts/EMBuild.bat
 Boxfish_wrapper.cpp
+Storm-Swig/Storm_wrapper.cpp
 SwigConfigWindows.lua
 SwigConfigLinux.lua
 Build.bat

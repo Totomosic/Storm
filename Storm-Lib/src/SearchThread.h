@@ -8,6 +8,11 @@
 #include "TimeManager.h"
 #include "TranspositionTable.h"
 
+#ifdef SWIG
+#define STORM_API
+#define ValueType int16_t
+#endif
+
 namespace Storm
 {
 
@@ -19,7 +24,7 @@ namespace Storm
 		bool Initialized = false;
 		SearchStack Stack[MAX_PLY + StackOffset + 1];
 		Move PvBuffer[MAX_PLY + 1];
-		std::unique_ptr<ZobristHash[]> PositionHistory = nullptr;
+		ZobristHash* PositionHistory = nullptr;
 		size_t Nodes = 0;
 		int Depth = 0;
 		int SelDepth = 0;

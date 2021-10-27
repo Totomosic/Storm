@@ -1,48 +1,69 @@
-project "Storm-Lib"
+project "Storm-Swig"
     location ""
-    kind "StaticLib"
+    kind "SharedLib"
     language "C++"
     cppdialect "C++17"
     staticruntime "on"
 
-    targetdir ("../bin/" .. StormOutputDir .. "/Storm-Lib")
-    objdir ("../bin-int/" .. StormOutputDir .. "/Storm-Lib")
+    targetdir ("../bin/" .. StormOutputDir .. "/Storm-Swig")
+    objdir ("../bin-int/" .. StormOutputDir .. "/Storm-Swig")
+    targetname ("_Storm")
+
+    configmap
+    {
+        ["Debug"] = "Release"
+    }
+
+    prebuildcommands
+    {
+        "\"" .. PYTHON_EXECUTABLE .. "\" generate_swig.py --swig \"" .. SWIG_EXECUTABLE .. "\" " .. "\"../bin/" .. StormOutputDir .. "/Storm-Swig\""
+    }
 
     files
     {
-        "src/**.h",
-        "src/**.cpp"
+        "Storm_wrapper.cpp"
     }
-    
+
     includedirs
     {
         "../%{StormIncludeDirs.spdlog}",
-        "src"
+        "../%{StormIncludeDirs.Storm}",
+        PYTHON_INCLUDE_DIR,
+    }
+
+    links
+    {
+        "Storm-Lib",
     }
 
     filter "system:windows"
         systemversion "latest"
+
+        targetextension (".pyd")
 
         defines
         {
             "STORM_PLATFORM_WINDOWS",
             "STORM_BUILD_STATIC",
             "_CRT_SECURE_NO_WARNINGS",
-            "NOMINMAX"
+            "NOMINMAX",
         }
 
     filter "system:linux"
         systemversion "latest"
 
+        targetextension (".so")
+        targetprefix ("")
+
         defines
         {
             "STORM_PLATFORM_LINUX",
-            "STORM_BUILD_STATIC"
+            "STORM_BUILD_STATIC",
         }
 
         links
         {
-            "pthread"
+            "pthread",
         }
 
     filter "system:macosx"
@@ -51,7 +72,7 @@ project "Storm-Lib"
         defines
         {
             "STORM_PLATFORM_MAC",
-            "STORM_BUILD_STATIC"
+            "STORM_BUILD_STATIC",
         }
 
     filter "configurations:Debug"
@@ -74,11 +95,7 @@ project "Storm-Lib"
         runtime "Release"
         optimize "on"
 
-        buildoptions { "-fPIC" }
-
     filter "configurations:DistShared"
         defines "STORM_DIST"
         runtime "Release"
         optimize "on"
-
-        buildoptions { "-fPIC" }

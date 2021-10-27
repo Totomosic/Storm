@@ -2,6 +2,7 @@
 #include "Format.h"
 #include "EvalConstants.h"
 #include "Attacks.h"
+#include "MoveGeneration.h"
 
 namespace Storm
 {
@@ -1040,6 +1041,14 @@ namespace Storm
 	{
 		stream << FormatPosition(position);
 		return stream;
+	}
+
+	std::vector<Move> GetLegalMoves(const Position& position)
+	{
+		Move buffer[MAX_MOVES];
+		MoveList<Move> moveList(buffer);
+		moveList.FillLegal<ALL>(position);
+		return std::vector<Move>{ moveList.begin(), moveList.end() };
 	}
 
 }

@@ -38,3 +38,6 @@ before you run the program.
 1. Run `Scripts/Linux-GenProjects.sh` to generate the Makefiles.
 2. Run `make -j<number_of_cores> Storm-Cli config=dist` to build Storm.
 3. Build outputs are located in the `bin` directory.
+
+## Building SWIG:
+On linux, must use the ```config=distshared``` when building

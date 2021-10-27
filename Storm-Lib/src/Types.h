@@ -12,6 +12,11 @@ inline constexpr T operator--(T& value, int) { value = T(value - 1); return T(va
 inline constexpr T operator+(T left, OTHER_T right) { return T(OTHER_T(left) + right); }	\
 inline constexpr T operator-(T left, OTHER_T right) { return T(OTHER_T(left) - right); }
 
+#ifdef SWIG
+#define STORM_API
+#define ValueType int16_t
+#endif
+
 namespace Storm
 {
 
@@ -172,6 +177,8 @@ namespace Storm
 
 	constexpr int PIECE_COUNT = PIECE_MAX - PIECE_START;
 
+#ifndef SWIG
 	using ValueType = int16_t;
+#endif
 
 }

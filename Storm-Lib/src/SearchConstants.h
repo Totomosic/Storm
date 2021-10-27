@@ -2,6 +2,11 @@
 #include "Types.h"
 #include "MoveGeneration.h"
 
+#ifdef SWIG
+#define STORM_API
+#define ValueType int16_t
+#endif
+
 namespace Storm
 {
 
