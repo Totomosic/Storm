@@ -12,12 +12,12 @@ using namespace Storm;
 %}
 
 %include "../Storm-Lib/src/Storm.h"
+%include "../Storm-Lib/src/Types.h"
 %include "../Storm-Lib/src/Bitboard.h"
 %include "../Storm-Lib/src/Move.h"
 %include "../Storm-Lib/src/Position.h"
 %include "../Storm-Lib/src/Evaluation.h"
 %include "../Storm-Lib/src/Format.h"
 %include "../Storm-Lib/src/SearchThread.h"
-%include "../Storm-Lib/src/Types.h"
 
 %template(MoveVector) std::vector<Storm::Move>;

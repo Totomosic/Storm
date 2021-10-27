@@ -87,6 +87,7 @@ namespace Storm
 		std::vector<ZobristHash> m_PositionHistory;
 		std::atomic_bool m_ShouldStop;
 		bool m_Stopped;
+		bool m_EnableLogging;
 		std::vector<Thread> m_Threads;
 
 	public:
@@ -94,6 +95,7 @@ namespace Storm
 
 		inline TranspositionTable& GetTranspositionTable() { return m_TranspositionTable; }
 
+		inline void SetLogging(bool enabled) { m_EnableLogging = enabled; }
 		inline void SetSettings(const SearchSettings& settings) { m_Settings = settings; }
 		void PushPosition(const ZobristHash& hash);
 		void Ponder(const Position& position, SearchLimits limits);

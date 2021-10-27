@@ -20,7 +20,7 @@ inline constexpr T operator-(T left, OTHER_T right) { return T(OTHER_T(left) - r
 namespace Storm
 {
 
-	enum Color : int8_t
+	STORM_API enum Color : int8_t
 	{
 		COLOR_WHITE,
 		COLOR_BLACK,

@@ -48,7 +48,7 @@ namespace Storm
     }
 
     Search::Search()
-        : m_TimeManager(), m_TranspositionTable(), m_Limits(), m_ShouldStop(false), m_Stopped(false), m_Threads()
+        : m_TimeManager(), m_TranspositionTable(), m_Limits(), m_ShouldStop(false), m_Stopped(false), m_EnableLogging(true), m_Threads()
     {
     }
 
@@ -92,14 +92,18 @@ namespace Storm
 
             total += perft;
 
-            std::cout << UCI::FormatMove(move) << ": " << perft << std::endl;
+            if (m_EnableLogging)
+                std::cout << UCI::FormatMove(move) << ": " << perft << std::endl;
         }
-        auto endTime = std::chrono::high_resolution_clock::now();
-        auto elapsed = endTime - startTime;
-        std::cout << "====================================" << std::endl;
-        std::cout << "Total Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << "ms" << std::endl;
-        std::cout << "Total Nodes: " << total << std::endl;
-        std::cout << "Nodes per Second: " << (size_t)(total / (double)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() * 1e9) << std::endl;
+        if (m_EnableLogging)
+        {
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto elapsed = endTime - startTime;
+            std::cout << "====================================" << std::endl;
+            std::cout << "Total Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << "ms" << std::endl;
+            std::cout << "Total Nodes: " << total << std::endl;
+            std::cout << "Nodes per Second: " << (size_t)(total / (double)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() * 1e9) << std::endl;
+        }
         return total;
     }
 
@@ -258,7 +262,7 @@ namespace Storm
             if (ShouldStopSearch(thread))
                 break;
 
-            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000) && thread->PvIndex < m_Settings.MultiPv)
+            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000) && thread->PvIndex < m_Settings.MultiPv && m_EnableLogging)
             {
                 size_t nodes = GetTotalNodes();
                 RootMove& bestMove = thread->RootMoves[thread->PvIndex];
@@ -486,7 +490,7 @@ namespace Storm
             if (move == stack->SkipMove)
                 continue;
 
-            if (thread->IsMain() && IsRoot && m_TimeManager.TotalElapsedMs() > 3000)
+            if (thread->IsMain() && IsRoot && m_TimeManager.TotalElapsedMs() > 3000 && m_EnableLogging)
                 std::cout << "info depth " << depth << " currmove " << UCI::FormatMove(move) << " currmovenumber " << moveIndex + 1 << std::endl;
 
             const bool givesCheck = position.GivesCheck(move);
