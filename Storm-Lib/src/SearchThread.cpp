@@ -471,9 +471,6 @@ namespace Storm
             }
         }
 
-        if (IsPvNode && depth >= 6 && (!ttHit || ttMove == MOVE_NONE))
-            depth -= 2;
-
         Move counterMove = thread->Tables.CounterMoves[GetFromSquare(previousMove)][GetToSquare(previousMove)];
         MoveSelector<ALL_MOVES> selector(position, stack, ttMove, counterMove, stack->Killers, &thread->Tables);
 
