@@ -28,7 +28,7 @@ before you run the program.
 ## Installing:
 1. Download or clone this repository (use flag `--recurse-submodules` or `--recursive` to include submodules).
 2. If on windows run the `Scripts/Win-GenProjects.bat` script to generate the Visual Studio 2019 project and solution files.
-3. Download a NNUE from [here](https://tests.stockfishchess.org/nns) and copy into working directory.
+3. For best performance, download a compatible NNUE from [here](https://tests.stockfishchess.org/nns) and copy into working directory. Working network [nn-76a8a7ffb820.nnue](https://tests.stockfishchess.org/api/nn/nn-76a8a7ffb820.nnue). Storm will default to a classical evaluation if no valid network is found.
 
 ## Building on Windows:
 1. Run `Scripts/Win-GenProjects.bat` and build the solution using Visual Studio 2019.
@@ -40,4 +40,7 @@ before you run the program.
 3. Build outputs are located in the `bin` directory.
 
 ## Building SWIG:
-On linux, must use the ```config=distshared``` when building
+On linux, must use the ```config=distshared``` when building.
+1. Install SWIG
+2. Setup a ```SwigConfigWindows.lua``` or ```SwigConfigLinux.lua``` depending on your platform. (Copy from ```SwigConfig.example.lua```)
+3. Build the ```Storm-Swig``` project as above for your platform
