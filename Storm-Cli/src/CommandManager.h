@@ -12,6 +12,7 @@ namespace Storm
 	{
 	private:
 		std::unordered_map<std::string, std::function<void(const std::vector<std::string>&)>> m_CommandMap;
+		bool m_UsingNNUE;
 
 		OpeningBook m_OpeningBook;
 

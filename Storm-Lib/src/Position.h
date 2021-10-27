@@ -157,8 +157,7 @@ namespace Storm
 
 		bool SeeGE(Move move, ValueType threshold = 0) const;
 
-		inline bool IsNetworkAvailable() const { return true; }
-		inline bool IsNetworkEnabled() const { return m_UseNetwork && IsNetworkAvailable(); }
+		inline bool IsNetworkEnabled() const { return m_UseNetwork; }
 
 		void AddPiece(ColorPiece piece, SquareIndex square);
 		void RemovePiece(SquareIndex square);

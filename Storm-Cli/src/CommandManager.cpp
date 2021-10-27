@@ -4,9 +4,9 @@ namespace Storm
 {
 
 	CommandManager::CommandManager()
-		: m_CommandMap(), m_OpeningBook(), m_CurrentPosition(CreateStartingPosition()), m_Search(), m_Searching(false), m_SearchThread(), m_UndoMove(MOVE_NONE), m_Undo()
+		: m_CommandMap(), m_UsingNNUE(IsNNUEAvailable()), m_OpeningBook(), m_CurrentPosition(CreateStartingPosition()), m_Search(), m_Searching(false), m_SearchThread(), m_UndoMove(MOVE_NONE), m_Undo()
 	{
-		m_CurrentPosition.SetNetworkEnabled(true);
+		m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
 		m_CommandMap["help"] = [this](const std::vector<std::string>& args)
 		{
 			Help();
@@ -148,6 +148,49 @@ namespace Storm
 				std::cout << "Cannot Undo" << std::endl;
 		};
 
+		m_CommandMap["nnue"] = [this](const std::vector<std::string>& args)
+		{
+			if (args.size() > 0)
+			{
+				if (args[0] == "on")
+				{
+					if (IsNNUEAvailable())
+					{
+						m_UsingNNUE = true;
+						m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
+						m_Search.Reset();
+						std::cout << "NNUE Evaluation enabled" << std::endl;
+					}
+					else
+					{
+						std::cout << "Failed to load NNUE, unable to enable NNUE evaluation." << std::endl;
+					}
+				}
+				else if (args[0] == "off")
+				{
+					m_UsingNNUE = false;
+					m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
+					m_Search.Reset();
+					std::cout << "NNUE Evaluation disabled" << std::endl;
+				}
+				else
+				{
+					std::cout << "Invalid argument: " << args[0] << std::endl;
+				}
+			}
+			else
+			{
+				if (m_UsingNNUE)
+				{
+					std::cout << "Using NNUE Evaluation :- " << GetNNUEFilename() << std::endl;
+				}
+				else
+				{
+					std::cout << "Using classical evaluation." << std::endl;
+				}
+			}
+		};
+
 		ExecuteCommand("ucinewgame");
 	}
 
@@ -222,6 +265,10 @@ namespace Storm
 		std::cout << "\t\tSearch the current position until told to stop." << std::endl;
 		std::cout << "* moves" << std::endl;
 		std::cout << "\tShow information about the legal moves in the current position." << std::endl;
+		std::cout << "* undo" << std::endl;
+		std::cout << "\tUndo the last played move." << std::endl;
+		std::cout << "* nnue [on | off]" << std::endl;
+		std::cout << "\tPrint information about the current network. Optionally, explicitly enable/disable the NNUE evaluation." << std::endl;
 		std::cout << "* stop" << std::endl;
 		std::cout << "\tStop searching as soon as possible." << std::endl;
 		std::cout << "* quit" << std::endl;
@@ -253,9 +300,9 @@ namespace Storm
 	{
 		if (!m_Searching)
 		{
-			// m_Search.Reset();
+			m_Search.Reset();
 			m_CurrentPosition = CreateStartingPosition();
-			m_CurrentPosition.SetNetworkEnabled(true);
+			m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
 		}
 	}
 
@@ -264,7 +311,7 @@ namespace Storm
 		std::cout << m_CurrentPosition << std::endl;
 		std::cout << "FEN: " << GetFENFromPosition(m_CurrentPosition) << std::endl;
 		std::cout << "Hash: " << std::hex << m_CurrentPosition.Hash.Hash << std::dec << std::endl;
-		// std::cout << "Known Draw: " << (IsKnownDraw(m_CurrentPosition) ? "true" : "false") << std::endl;
+		std::cout << "Known Draw: " << (InsufficientMaterial(m_CurrentPosition) ? "true" : "false") << std::endl;
 	}
 
 	void CommandManager::SetOption(std::string name, const std::string* value)
@@ -308,7 +355,7 @@ namespace Storm
 		{
 			// m_Search.Reset();
 			m_CurrentPosition = CreatePositionFromFEN(fen);
-			m_CurrentPosition.SetNetworkEnabled(true);
+			m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
 		}
 	}
 
@@ -358,11 +405,18 @@ namespace Storm
 	{
 		StateInfo st;
 		m_CurrentPosition.Reset(&st);
-		// EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
-		// std::cout << FormatEvaluation(evaluation) << std::endl;
-		std::cout << FormatNNUEEvaluation(m_CurrentPosition) << std::endl;
-		if (m_CurrentPosition.IsNetworkEnabled())
-			std::cout << "NNUE evaluation: " << NNUE::EvaluateNNUE(m_CurrentPosition, true) * (m_CurrentPosition.ColorToMove == COLOR_WHITE ? 1 : -1) << " (white side)" << std::endl;
+		
+		if (m_UsingNNUE)
+		{
+			std::cout << FormatNNUEEvaluation(m_CurrentPosition) << std::endl;
+			if (m_CurrentPosition.IsNetworkEnabled())
+				std::cout << "NNUE evaluation: " << NNUE::EvaluateNNUE(m_CurrentPosition, true) * (m_CurrentPosition.ColorToMove == COLOR_WHITE ? 1 : -1) << " (white side)" << std::endl;
+		}
+		else
+		{
+			 EvaluationResult evaluation = EvaluateDetailed(m_CurrentPosition);
+			 std::cout << FormatEvaluation(evaluation) << std::endl;
+		}
 	}
 
 	void CommandManager::Perft(int depth)

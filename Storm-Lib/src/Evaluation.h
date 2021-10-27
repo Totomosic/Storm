@@ -156,6 +156,8 @@ namespace Storm
 	};
 
 	void InitEvaluation(const std::string& evalFilename);
+	bool IsNNUEAvailable();
+	std::string GetNNUEFilename();
 
 	EvaluationResult EvaluateDetailed(const Position& position);
 	ValueType Evaluate(const Position& position);

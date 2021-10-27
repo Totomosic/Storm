@@ -101,6 +101,10 @@ namespace Storm
 		void Ponder(const Position& position, SearchLimits limits);
 		BestMove SearchBestMove(const Position& position, SearchLimits limits);
 		size_t Perft(const Position& position, int depth);
+		inline void Reset()
+		{
+			m_TranspositionTable.Clear();
+		}
 
 		void Stop();
 

@@ -9,6 +9,9 @@
 namespace Storm
 {
 
+	static bool NNUEAvailable = false;
+	static std::string NNUEFilename = "";
+
 	// ValueType PieceSquareTables[COLOR_MAX][PIECE_COUNT][GAME_STAGE_MAX][SQUARE_MAX];
 	BitBoard PassedPawnMasks[COLOR_MAX][SQUARE_MAX];
 	BitBoard SupportedPawnMasks[COLOR_MAX][SQUARE_MAX];
@@ -62,6 +65,18 @@ namespace Storm
 			std::cout << "Loaded network " << networkFilename << std::endl;
 		else
 			std::cout << "Failed to load NNUE parameters" << std::endl;
+		NNUEAvailable = networkLoaded;
+		NNUEFilename = networkFilename;
+	}
+
+	bool IsNNUEAvailable()
+	{
+		return NNUEAvailable;
+	}
+
+	std::string GetNNUEFilename()
+	{
+		return NNUEFilename;
 	}
 
 	template<Color C>
