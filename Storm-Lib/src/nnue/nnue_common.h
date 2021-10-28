@@ -20,7 +20,11 @@
 
 #pragma once
 
+#ifdef EMSCRIPTEN
 #define USE_SSE2 1
+#else
+#define USE_SSE2 1
+#endif
 
 #include <cstring>
 #include <iostream>
@@ -68,7 +72,7 @@ namespace Storm::NNUE {
 #elif defined(_WIN32)
         return _mm_malloc(size, alignment);
 #else
-        return std::aligned_alloc(alignment, size);
+        return aligned_alloc(alignment, size);
 #endif
     }
 

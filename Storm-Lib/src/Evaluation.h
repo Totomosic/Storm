@@ -183,7 +183,12 @@ namespace Storm
 	inline bool InsufficientMaterial(const Position& position)
 	{
 		BitBoard pieces = position.GetPieces();
-		return Popcount(pieces) <= 3 && (pieces & position.GetPieces(PIECE_KNIGHT, PIECE_BISHOP));
+		int count = Popcount(pieces);
+		// 2 Kings on the board
+		if (count <= 2)
+			return true;
+		// 2 Kings + Knight/Bishop
+		return count <= 3 && (pieces & position.GetPieces(PIECE_KNIGHT, PIECE_BISHOP));
 	}
 
 }

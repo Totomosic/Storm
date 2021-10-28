@@ -1,5 +1,6 @@
 #include "SearchThread.h"
 #include <random>
+#include <thread>
 
 namespace Storm
 {
@@ -57,19 +58,19 @@ namespace Storm
         m_PositionHistory.push_back(hash);
     }
 
-    void Search::Ponder(const Position& position, SearchLimits limits)
+    void Search::Ponder(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
     {
         limits.Infinite = true;
-        SearchBestMove(position, limits);
+        SearchBestMove(position, limits, callback);
     }
 
-    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits)
+    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
     {
         StateInfo st;
         Position pos = position;
         pos.Reset(&st);
         m_Limits = limits;
-        return BeginSearch(pos, limits.Depth > 0 && !limits.Infinite ? limits.Depth : MAX_PLY);
+        return BeginSearch(pos, limits.Depth > 0 && !limits.Infinite ? limits.Depth : MAX_PLY, callback);
     }
 
     size_t Search::Perft(const Position& pos, int depth)
@@ -140,7 +141,7 @@ namespace Storm
         return nodes;
     }
 
-    BestMove Search::BeginSearch(Position& position, int depth)
+    BestMove Search::BeginSearch(Position& position, int depth, const SearchCallback& callback)
     {
         m_Stopped = false;
         m_ShouldStop = false;
@@ -154,10 +155,10 @@ namespace Storm
         std::vector<std::thread> threads;
         for (int i = 1; i < m_Threads.size(); i++)
         {
-            threads.push_back(std::thread(std::bind(&Search::IterativeDeepeningSearch, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3), this, &m_Threads[i], depth));
+            threads.push_back(std::thread(std::bind(&Search::IterativeDeepeningSearch, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4), this, &m_Threads[i], depth, callback));
         }
 
-        IterativeDeepeningSearch(&m_Threads[0], depth);
+        IterativeDeepeningSearch(&m_Threads[0], depth, callback);
 
         for (std::thread& thread : threads)
             thread.join();
@@ -175,7 +176,7 @@ namespace Storm
         return { bestMove, ponderMove };
     }
 
-    void Search::IterativeDeepeningSearch(Thread* thread, int maxDepth)
+    void Search::IterativeDeepeningSearch(Thread* thread, int maxDepth, const SearchCallback& callback)
     {
         SearchStack* stack = thread->Stack + Thread::StackOffset;
 
@@ -193,7 +194,7 @@ namespace Storm
             {
                 thread->PvIndex = i;
                 thread->SelDepth = 0;
-                ValueType value = AspirationWindowSearch(thread, stack);
+                ValueType value = AspirationWindowSearch(thread, stack, callback);
 
                 if (ShouldStopSearch(thread))
                     break;
@@ -236,7 +237,7 @@ namespace Storm
         }
     }
 
-    ValueType Search::AspirationWindowSearch(Thread* thread, SearchStack* stack)
+    ValueType Search::AspirationWindowSearch(Thread* thread, SearchStack* stack, const SearchCallback& callback)
     {
         bool isMainThread = thread->ThreadIndex == 0;
         int depth = thread->Depth;
@@ -262,32 +263,46 @@ namespace Storm
             if (ShouldStopSearch(thread))
                 break;
 
-            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000) && thread->PvIndex < m_Settings.MultiPv && m_EnableLogging)
+            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000) && thread->PvIndex < m_Settings.MultiPv)
             {
                 size_t nodes = GetTotalNodes();
                 RootMove& bestMove = thread->RootMoves[thread->PvIndex];
-                std::cout << "info depth " << depth << " seldepth " << thread->SelDepth << " score ";
-                if (!IsMateScore(bestMove.Score))
+                if (m_EnableLogging)
                 {
-                    std::cout << "cp " << bestMove.Score;
-                }
-                else
-                {
-                    if (bestMove.Score > 0)
-                        std::cout << "mate " << (GetPliesFromMateScore(bestMove.Score) / 2 + 1);
+                    std::cout << "info depth " << depth << " seldepth " << thread->SelDepth << " score ";
+                    if (!IsMateScore(bestMove.Score))
+                    {
+                        std::cout << "cp " << bestMove.Score;
+                    }
                     else
-                        std::cout << "mate " << -(GetPliesFromMateScore(bestMove.Score) / 2);
+                    {
+                        if (bestMove.Score > 0)
+                            std::cout << "mate " << (GetPliesFromMateScore(bestMove.Score) / 2 + 1);
+                        else
+                            std::cout << "mate " << -(GetPliesFromMateScore(bestMove.Score) / 2);
+                    }
+                    if (bestMove.Score <= alpha)
+                        std::cout << " upperbound";
+                    else if (bestMove.Score >= beta)
+                        std::cout << " lowerbound";
+                    std::cout << " nodes " << nodes << " nps " << size_t(nodes * 1000 / (m_TimeManager.TotalElapsedMs() + 1));
+                    std::cout << " time " << m_TimeManager.TotalElapsedMs() << " hashfull " << m_TranspositionTable.HashFull() << " multipv " << thread->PvIndex + 1;
+                    std::cout << " pv";
+                    for (Move mv : bestMove.Pv)
+                        std::cout << " " << UCI::FormatMove(mv);
+                    std::cout << std::endl;
                 }
-                if (bestMove.Score <= alpha)
-                    std::cout << " upperbound";
-                else if (bestMove.Score >= beta)
-                    std::cout << " lowerbound";
-                std::cout << " nodes " << nodes << " nps " << size_t(nodes * 1000 / (m_TimeManager.TotalElapsedMs() + 1));
-                std::cout << " time " << m_TimeManager.TotalElapsedMs() << " hashfull " << m_TranspositionTable.HashFull() << " multipv " << thread->PvIndex + 1;
-                std::cout << " pv";
-                for (Move mv : bestMove.Pv)
-                    std::cout << " " << UCI::FormatMove(mv);
-                std::cout << std::endl;
+                if (callback)
+                {
+                    SearchResult result;
+                    result.BestMove = bestMove.Pv[0];
+                    result.Depth = depth;
+                    result.SelDepth = thread->SelDepth;
+                    result.PVIndex = thread->PvIndex;
+                    result.Score = bestMove.Score;
+                    result.PV = bestMove.Pv;
+                    callback(result);
+                }
             }
 
             if (value <= alpha && value != -VALUE_MATE)

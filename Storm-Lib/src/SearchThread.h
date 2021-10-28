@@ -1,4 +1,6 @@
 #pragma once
+#include <functional>
+
 #include "EvalConstants.h"
 #include "Evaluation.h"
 #include "Format.h"
@@ -55,6 +57,9 @@ namespace Storm
 
 	class STORM_API Search
 	{
+	public:
+		using SearchCallback = std::function<void(const SearchResult&)>;
+
 	private:
 		struct STORM_API Thread
 		{
@@ -95,12 +100,13 @@ namespace Storm
 		Search();
 
 		inline TranspositionTable& GetTranspositionTable() { return m_TranspositionTable; }
+		inline const SearchSettings& GetSettings() const { return m_Settings; }
 
 		inline void SetLogging(bool enabled) { m_EnableLogging = enabled; }
 		inline void SetSettings(const SearchSettings& settings) { m_Settings = settings; }
 		void PushPosition(const ZobristHash& hash);
-		void Ponder(const Position& position, SearchLimits limits);
-		BestMove SearchBestMove(const Position& position, SearchLimits limits);
+		void Ponder(const Position& position, SearchLimits limits, const SearchCallback& callback = {});
+		BestMove SearchBestMove(const Position& position, SearchLimits limits, const SearchCallback& callback = {});
 		size_t Perft(const Position& position, int depth);
 		inline void Reset()
 		{
@@ -111,9 +117,9 @@ namespace Storm
 
 	private:
 		size_t PerftPosition(Position& position, int depth);
-		BestMove BeginSearch(Position& position, int depth);
-		void IterativeDeepeningSearch(Thread* thread, int maxDepth);
-		ValueType AspirationWindowSearch(Thread* thread, SearchStack* stack);
+		BestMove BeginSearch(Position& position, int depth, const SearchCallback& callback);
+		void IterativeDeepeningSearch(Thread* thread, int maxDepth, const SearchCallback& callback);
+		ValueType AspirationWindowSearch(Thread* thread, SearchStack* stack, const SearchCallback& callback);
 		template<bool IsPvNode>
 		ValueType AlphaBetaSearch(Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode);
 		template<bool IsPvNode>

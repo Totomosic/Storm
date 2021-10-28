@@ -192,10 +192,10 @@ namespace Test
 
 		Move move = CreateMove(e2, e4);
 
-		tte.Update(position.Hash, move, -5, BOUND_EXACT, VALUE_MATE - 10, -2000);
+		tte.Update(position.Hash, move, 5, BOUND_EXACT, VALUE_MATE - 10, -2000);
 		REQUIRE(tte.GetHash() == position.Hash);
 		REQUIRE(tte.GetMove() == move);
-		REQUIRE(tte.GetDepth() == -5);
+		REQUIRE(tte.GetDepth() == 5);
 		REQUIRE(tte.GetValue() == VALUE_MATE - 10);
 		REQUIRE(tte.GetBound() == BOUND_EXACT);
 		REQUIRE(tte.GetStaticEvaluation() == -2000);
@@ -336,7 +336,7 @@ namespace Test
 			ValueType eval = Evaluate(position, position.TeamToPlay);
 			REQUIRE(eval == Evaluate(MirrorPosition(position), OtherTeam(position.TeamToPlay)));
 		}
-	}
+	}*/
 
 	TEST_CASE("PGN", "[FORMATTING]")
 	{
@@ -344,6 +344,12 @@ namespace Test
 		Position position = CreatePositionFromFEN("r2q3k/p2P3p/1p3p2/3QP1r1/8/B7/P5PP/2R3K1 w - -");
 		Move move = PGN::CreateMoveFromString(position, "Qxa8");
 		REQUIRE(move != MOVE_NONE);
-	}*/
+		REQUIRE(GetFromSquare(move) == d5);
+		REQUIRE(GetToSquare(move) == a8);
+
+		move = CreateMove(c1, c8);
+		std::string format = PGN::FormatMove(move, position);
+		REQUIRE(format == "Rc8");
+	}
 
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 
 #include "Bitboard.h"
 #include "ZobristHash.h"
@@ -116,6 +117,8 @@ namespace Storm
 
 		void Reset(StateInfo* st);
 		inline StateInfo* GetState() const { return m_StateInfo; }
+		// Mainly for SWIG usage
+		inline uint64_t GetHashInteger() const { return Hash.Hash; }
 
 		inline BitBoard GetPieces() const { return Cache.AllPieces; }
 		inline BitBoard GetPieces(Piece p0) const { return GetPieces(COLOR_WHITE, p0) | GetPieces(COLOR_BLACK, p0); }

@@ -26,6 +26,7 @@ include (StormLibDir)
 include (StormCliDir)
 include (StormTestDir)
 include (StormBookDir)
+include ("Storm-Emscripten")
 
 if os.target() == "windows" then
     -- Windows

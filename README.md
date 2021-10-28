@@ -2,11 +2,10 @@
 C++ UCI Chess engine inspired by [Stockfish](https://stockfishchess.org/).
 Created using ideas learned during the development of [Boxfish](https://github.com/Totomosic/Boxfish).
 
-Example of the engine running [here](https://totomosic.github.io). (built to WebAssembly with Emscripten - slightly older version)
+Example of the engine running [here](https://totomosic.github.io). (built to WebAssembly with Emscripten, note there is ~10x speed decrease compared to native code)
 
-Storm currently uses the same NNUE as Stockfish (future plans to train network independently).
-For now you should download a network from [https://tests.stockfishchess.org/nns](https://tests.stockfishchess.org/nns) and copy it into the working directory
-before you run the program.
+Storm currently can use the same NNUE as Stockfish (future plans to train network independently).
+For now you should download a network from [https://tests.stockfishchess.org/nns](https://tests.stockfishchess.org/nns) and copy it into the working directory before you run the program. Storm will default to a classical evaluation if no network file is found.
 
 ## Features
 - Bitboards and magic bitboard move generation
@@ -44,3 +43,9 @@ On linux, must use the ```config=distshared``` when building.
 1. Install SWIG
 2. Setup a ```SwigConfigWindows.lua``` or ```SwigConfigLinux.lua``` depending on your platform. (Copy from ```SwigConfig.example.lua```)
 3. Build the ```Storm-Swig``` project as above for your platform
+
+## Building Emscripten
+1. Install emsdk
+2. If using NNUE, copy your NNUE network into the ```Storm-Emscripten``` directory
+3. Run ```emsdk activate``` then inside ```Storm-Emscripten``` run ```python build.py```
+4. Outputs are located in ```bin/Web```
