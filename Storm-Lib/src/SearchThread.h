@@ -16,30 +16,6 @@
 namespace Storm
 {
 
-	struct STORM_API Thread
-	{
-	public:
-		static constexpr int StackOffset = 4;
-	public:
-		bool Initialized = false;
-		SearchStack Stack[MAX_PLY + StackOffset + 1];
-		Move PvBuffer[MAX_PLY + 1];
-		ZobristHash* PositionHistory = nullptr;
-		size_t Nodes = 0;
-		int Depth = 0;
-		int SelDepth = 0;
-		int PvIndex = 0;
-		int BestMoveChanges = 0;
-		int ThreadIndex = 0;
-		std::vector<RootMove> RootMoves;
-		SearchTables Tables;
-		StateInfo RootStateInfo;
-		Storm::Position Position;
-
-	public:
-		inline bool IsMain() const { return ThreadIndex == 0; }
-	};
-
 	constexpr ValueType GetValueForTT(ValueType value, int ply)
 	{
 		return IsMateScore(value) ? (value < 0 ? value - ply : value + ply) : value;
@@ -79,6 +55,31 @@ namespace Storm
 
 	class STORM_API Search
 	{
+	private:
+		struct STORM_API Thread
+		{
+		public:
+			static constexpr int StackOffset = 4;
+		public:
+			bool Initialized = false;
+			SearchStack Stack[MAX_PLY + StackOffset + 1];
+			Move PvBuffer[MAX_PLY + 1];
+			std::unique_ptr<ZobristHash[]> PositionHistory = nullptr;
+			size_t Nodes = 0;
+			int Depth = 0;
+			int SelDepth = 0;
+			int PvIndex = 0;
+			int BestMoveChanges = 0;
+			int ThreadIndex = 0;
+			std::vector<RootMove> RootMoves;
+			SearchTables Tables;
+			StateInfo RootStateInfo;
+			Storm::Position Position;
+
+		public:
+			inline bool IsMain() const { return ThreadIndex == 0; }
+		};
+
 	private:
 		TimeManager m_TimeManager;
 		TranspositionTable m_TranspositionTable;

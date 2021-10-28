@@ -150,44 +150,13 @@ namespace Storm
 
 		m_CommandMap["nnue"] = [this](const std::vector<std::string>& args)
 		{
-			if (args.size() > 0)
+			if (m_UsingNNUE)
 			{
-				if (args[0] == "on")
-				{
-					if (IsNNUEAvailable())
-					{
-						m_UsingNNUE = true;
-						m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
-						m_Search.Reset();
-						std::cout << "NNUE Evaluation enabled" << std::endl;
-					}
-					else
-					{
-						std::cout << "Failed to load NNUE, unable to enable NNUE evaluation." << std::endl;
-					}
-				}
-				else if (args[0] == "off")
-				{
-					m_UsingNNUE = false;
-					m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
-					m_Search.Reset();
-					std::cout << "NNUE Evaluation disabled" << std::endl;
-				}
-				else
-				{
-					std::cout << "Invalid argument: " << args[0] << std::endl;
-				}
+				std::cout << "Using NNUE Evaluation :- " << GetNNUEFilename() << std::endl;
 			}
 			else
 			{
-				if (m_UsingNNUE)
-				{
-					std::cout << "Using NNUE Evaluation :- " << GetNNUEFilename() << std::endl;
-				}
-				else
-				{
-					std::cout << "Using classical evaluation." << std::endl;
-				}
+				std::cout << "Using classical evaluation." << std::endl;
 			}
 		};
 
@@ -240,6 +209,8 @@ namespace Storm
 		std::cout << "\t\tNumber of threads to use during search, for best performance set to the number of CPU cores available. (default 1)" << std::endl;
 		std::cout << "\t* Hash" << std::endl;
 		std::cout << "\t\tSize of the hash table in MB. (default 32)" << std::endl;
+		std::cout << "\t* Use NNUE" << std::endl;
+		std::cout << "\t\tEnable/Disable the use of NNUE evaluation. (default true)" << std::endl;
 		std::cout << "* d" << std::endl;
 		std::cout << "\tPrint the current position." << std::endl;
 		std::cout << "* position [fen <fenstring> | startpos] [moves <moves>...]" << std::endl;
@@ -267,8 +238,8 @@ namespace Storm
 		std::cout << "\tShow information about the legal moves in the current position." << std::endl;
 		std::cout << "* undo" << std::endl;
 		std::cout << "\tUndo the last played move." << std::endl;
-		std::cout << "* nnue [on | off]" << std::endl;
-		std::cout << "\tPrint information about the current network. Optionally, explicitly enable/disable the NNUE evaluation." << std::endl;
+		std::cout << "* nnue" << std::endl;
+		std::cout << "\tPrint information about the current network." << std::endl;
 		std::cout << "* stop" << std::endl;
 		std::cout << "\tStop searching as soon as possible." << std::endl;
 		std::cout << "* quit" << std::endl;
@@ -292,6 +263,7 @@ namespace Storm
 		std::cout << "option name Skill Level type spin default 20 min 1 max 20" << std::endl;
 		std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
 		std::cout << "option name Hash type spin default 32 min 1 max 262144" << std::endl;
+		std::cout << "option name Use NNUE type check default true" << std::endl;
 
 		std::cout << "uciok" << std::endl;
 	}
@@ -321,17 +293,45 @@ namespace Storm
 		{
 			m_Settings.MultiPv = std::max(1, std::stoi(*value));
 		}
-		if (name == "skill level" && value != nullptr)
+		else if (name == "skill level" && value != nullptr)
 		{
 			m_Settings.SkillLevel = std::min(std::max(0, std::stoi(*value)), 20);
 		}
-		if (name == "threads" && value != nullptr)
+		else if (name == "threads" && value != nullptr)
 		{
 			m_Settings.Threads = std::min(std::max(1, std::stoi(*value)), 256);
 		}
-		if (name == "hash" && value != nullptr)
+		else if (name == "hash" && value != nullptr)
 		{
 			m_Settings.HashBytes = size_t(std::stoi(*value)) * 1024ULL * 1024ULL;
+		}
+		else if (name == "use nnue" && value != nullptr)
+		{
+			std::string lowercaseValue = *value;
+			std::transform(lowercaseValue.begin(), lowercaseValue.end(), lowercaseValue.begin(), [](char c) { return std::tolower(c); });
+			if (lowercaseValue == "true")
+			{
+				if (IsNNUEAvailable())
+				{
+					m_UsingNNUE = true;
+					m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
+					m_Search.Reset();
+				}
+				else
+				{
+					std::cout << "Failed to load NNUE, unable to enable NNUE evaluation." << std::endl;
+				}
+			}
+			else if (lowercaseValue == "false")
+			{
+				m_UsingNNUE = false;
+				m_CurrentPosition.SetNetworkEnabled(m_UsingNNUE);
+				m_Search.Reset();
+			}
+			else
+			{
+				std::cout << "Invalid option value: " << *value << std::endl;
+			}
 		}
 		/*if (name == "book")
 		{

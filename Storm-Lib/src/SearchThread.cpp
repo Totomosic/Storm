@@ -902,8 +902,6 @@ namespace Storm
 
     void Search::CreateAndInitializeThreads(Position& position, int count)
     {
-        for (Thread& thread : m_Threads)
-            delete[] thread.PositionHistory;
         m_Threads.resize(count);
         for (int i = 0; i < count; i++)
         {
@@ -941,7 +939,7 @@ namespace Storm
         thread->Depth = 1;
         thread->SelDepth = 0;
         thread->RootMoves = GenerateRootMoves(position, m_Limits.Only);
-        thread->PositionHistory = new ZobristHash[m_PositionHistory.size() + MAX_PLY + 1 + count];
+        thread->PositionHistory = std::make_unique<ZobristHash[]>(m_PositionHistory.size() + MAX_PLY + 1 + count);
         thread->Position = position;
         thread->Position.Reset(&thread->RootStateInfo);
         thread->PvIndex = 0;
@@ -954,7 +952,7 @@ namespace Storm
             thread->Initialized = true;
         }
         SearchStack* stackPtr = thread->Stack;
-        ZobristHash* historyPtr = thread->PositionHistory + std::max(0, (count - (int)m_PositionHistory.size()));
+        ZobristHash* historyPtr = thread->PositionHistory.get() + std::max(0, (count - (int)m_PositionHistory.size()));
 
         for (int i = 0; i < m_PositionHistory.size(); i++)
         {
