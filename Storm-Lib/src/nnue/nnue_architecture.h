@@ -22,8 +22,6 @@
 
 #include "nnue_common.h"
 
-#include "nnue/features/half_ka_v2.h"
-
 #include "layers/input_slice.h"
 #include "layers/affine_transform.h"
 #include "layers/clipped_relu.h"
@@ -31,10 +29,10 @@
 namespace Storm::NNUE {
 
   // Input features used in evaluation function
-  // using FeatureSet = HalfKAv2;
+  // using FeatureSet = HalfKAv2_hm;
 
   // Number of input feature dimensions after conversion
-  constexpr IndexType TransformedFeatureDimensions = 512;
+  constexpr IndexType TransformedFeatureDimensions = 1024;
   constexpr IndexType PSQTBuckets = 8;
   constexpr IndexType LayerStacks = 8;
 
@@ -42,7 +40,7 @@ namespace Storm::NNUE {
 
     // Define network structure
     using InputLayer = InputSlice<TransformedFeatureDimensions * 2>;
-    using HiddenLayer1 = ClippedReLU<AffineTransform<InputLayer, 16>>;
+    using HiddenLayer1 = ClippedReLU<AffineTransform<InputLayer, 8>>;
     using HiddenLayer2 = ClippedReLU<AffineTransform<HiddenLayer1, 32>>;
     using OutputLayer = AffineTransform<HiddenLayer2, 1>;
 

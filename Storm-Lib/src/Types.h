@@ -17,6 +17,8 @@ inline constexpr T operator-(T left, OTHER_T right) { return T(OTHER_T(left) - r
 #define ValueType int16_t
 #endif
 
+constexpr bool Is64Bit = true;
+
 namespace Storm
 {
 

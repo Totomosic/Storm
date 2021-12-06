@@ -27,7 +27,7 @@ For now you should download a network from [https://tests.stockfishchess.org/nns
 ## Installing:
 1. Download or clone this repository (use flag `--recurse-submodules` or `--recursive` to include submodules).
 2. If on windows run the `Scripts/Win-GenProjects.bat` script to generate the Visual Studio 2019 project and solution files.
-3. For best performance, download a compatible NNUE from [here](https://tests.stockfishchess.org/nns) and copy into working directory. Working network [nn-76a8a7ffb820.nnue](https://tests.stockfishchess.org/api/nn/nn-76a8a7ffb820.nnue). Storm will default to a classical evaluation if no valid network is found.
+3. For best performance, download a compatible NNUE from [here](https://tests.stockfishchess.org/nns) and copy into working directory. Working network [nn-76a8a7ffb820.nnue](https://tests.stockfishchess.org/api/nn/nn-cdf1785602d6.nnue). Storm will default to a classical evaluation if no valid network is found.
 
 ## Building on Windows:
 1. Run `Scripts/Win-GenProjects.bat` and build the solution using Visual Studio 2019.
