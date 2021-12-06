@@ -50,6 +50,7 @@ namespace Storm
 		// Debug helpers
 		void Moves();
 		void Probe();
+		void ProbeTT();
 
 		// Utils
 		std::unordered_set<Move> GetMoveList(const std::vector<std::string>& args, int offset) const;

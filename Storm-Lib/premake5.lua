@@ -11,13 +11,13 @@ project "Storm-Lib"
     files
     {
         "src/**.h",
-        "src/**.cpp"
+        "src/**.cpp",
     }
     
     includedirs
     {
         "../%{StormIncludeDirs.spdlog}",
-        "src"
+        "src",
     }
 
     filter "system:windows"
@@ -28,7 +28,7 @@ project "Storm-Lib"
             "STORM_PLATFORM_WINDOWS",
             "STORM_BUILD_STATIC",
             "_CRT_SECURE_NO_WARNINGS",
-            "NOMINMAX"
+            "NOMINMAX",
         }
 
     filter "system:linux"
@@ -37,12 +37,12 @@ project "Storm-Lib"
         defines
         {
             "STORM_PLATFORM_LINUX",
-            "STORM_BUILD_STATIC"
+            "STORM_BUILD_STATIC",
         }
 
         links
         {
-            "pthread"
+            "pthread",
         }
 
     filter "system:macosx"
@@ -51,7 +51,7 @@ project "Storm-Lib"
         defines
         {
             "STORM_PLATFORM_MAC",
-            "STORM_BUILD_STATIC"
+            "STORM_BUILD_STATIC",
         }
 
     filter "configurations:Debug"

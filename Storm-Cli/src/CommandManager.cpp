@@ -127,6 +127,11 @@ namespace Storm
 			Probe();
 		};
 
+		m_CommandMap["probett"] = [this](const std::vector<std::string>& args)
+		{
+			ProbeTT();
+		};
+
 		m_CommandMap["stop"] = [this](const std::vector<std::string>& args)
 		{
 			Stop();
@@ -489,6 +494,12 @@ namespace Storm
 
 	void CommandManager::Moves()
 	{
+		for (Move mv : GetLegalMoves(m_CurrentPosition))
+		{
+			std::cout << UCI::FormatMove(mv) << std::endl;
+		}
+		return;
+
 		Move moveBuffer[MAX_MOVES];
 		Move* it = moveBuffer;
 		Move* end;
@@ -542,6 +553,25 @@ namespace Storm
 		{
 			std::cout << "No transposition table entry found. Entry hash: " << std::hex << entry->GetHash().Hash << std::dec << std::endl;
 		}*/
+	}
+
+	void CommandManager::ProbeTT()
+	{
+		const TranspositionTable& tt = m_Search.GetTranspositionTable();
+		bool ttHit;
+		TranspositionTableEntry* entry = tt.GetEntry(m_CurrentPosition.Hash, ttHit);
+		if (ttHit)
+		{
+			std::cout << "Transposition Table Entry:" << std::endl;
+			std::cout << "Depth: " << entry->GetDepth() << std::endl;
+			std::cout << "Move: " << UCI::FormatMove(entry->GetMove()) << std::endl;
+			std::cout << "Score: " << entry->GetValue() << std::endl;
+			std::cout << "Bound: " << (entry->GetBound() == BOUND_EXACT ? "EXACT" : entry->GetBound() == BOUND_UPPER ? "UPPER" : "LOWER") << std::endl;
+		}
+		else
+		{
+			std::cout << "No transposition table entry found. Entry hash: " << std::hex << entry->GetHash().Hash << std::dec << std::endl;
+		}
 	}
 
 	void CommandManager::Stop()

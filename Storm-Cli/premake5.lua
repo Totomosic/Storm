@@ -4,26 +4,26 @@ project "Storm-Cli"
     language "C++"
     cppdialect "C++17"
     staticruntime "on"
-    
+
     targetdir ("../bin/" .. StormOutputDir .. "/Storm-Cli")
     objdir ("../bin-int/" .. StormOutputDir .. "/Storm-Cli")
-    
+
     files
     {
         "src/**.h",
-        "src/**.cpp"
+        "src/**.cpp",
     }
-    
+
     includedirs
     {
         "src",
         "../%{StormIncludeDirs.spdlog}",
-        "../%{StormIncludeDirs.Storm}"
+        "../%{StormIncludeDirs.Storm}",
     }
 
     links
     {
-        "Storm-Lib"
+        "Storm-Lib",
     }
 
     filter "system:windows"
@@ -34,7 +34,7 @@ project "Storm-Cli"
             "STORM_PLATFORM_WINDOWS",
             "STORM_BUILD_STATIC",
             "_CRT_SECURE_NO_WARNINGS",
-            "NOMINMAX"
+            "NOMINMAX",
         }
 
     filter "system:linux"
@@ -45,12 +45,12 @@ project "Storm-Cli"
         defines
         {
             "STORM_PLATFORM_LINUX",
-            "STORM_BUILD_STATIC"
+            "STORM_BUILD_STATIC",
         }
 
         links
         {
-            "pthread"
+            "pthread",
         }
 
     filter "system:macosx"
