@@ -163,11 +163,13 @@ namespace Storm::NNUE {
         const auto positional = network[bucket]->propagate(transformedFeatures, buffer)[0];
 
         // Give more value to positional evaluation when material is balanced
+        ValueType eval;
         if (adjusted
             && abs(pos.GetNonPawnMaterial(COLOR_WHITE) - pos.GetNonPawnMaterial(COLOR_BLACK)) <= RookValueMg - BishopValueMg)
-            return  static_cast<ValueType>(((128 - delta) * psqt + (128 + delta) * positional) / 128 / OutputScale);
+            eval = static_cast<ValueType>(((128 - delta) * psqt + (128 + delta) * positional) / 128 / OutputScale);
         else
-            return static_cast<ValueType>((psqt + positional) / OutputScale);
+            eval = static_cast<ValueType>((psqt + positional) / OutputScale);
+        return 136 * eval / 216;
     }
 
     struct NnueEvalTrace {
