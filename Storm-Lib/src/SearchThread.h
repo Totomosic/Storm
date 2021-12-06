@@ -126,6 +126,7 @@ namespace Storm
 		ValueType QuiescenceSearch(Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode);
 
 		void UpdateQuietStats(Thread* thread, SearchStack* stack, Move move) const;
+		bool Is3Fold(const Position& position, SearchStack* stack) const;
 		bool IsDraw(const Position& position, SearchStack* stack) const;
 		bool ShouldStopSearch(Thread* thread) const;
 		std::vector<RootMove> GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const;
@@ -133,6 +134,11 @@ namespace Storm
 		void InitTimeManagement(const Position& position);
 		void CreateAndInitializeThreads(Position& position, int count);
 		void InitializeThread(Position& position, Thread* thread, int index);
+
+		inline ValueType GetDrawValue(Thread* thread) const
+		{
+			return VALUE_DRAW + (2 * (thread->Nodes & 1) - 1);
+		}
 
 		inline size_t GetTotalNodes() const
 		{

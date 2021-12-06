@@ -20,7 +20,7 @@ namespace Storm
 	{
 		return 80 * depth;
 	}
-	constexpr int FutilityDepth = 6;
+	constexpr int FutilityDepth = 8;
 
 	constexpr int GetNullMoveDepthReduction(int depth, ValueType eval, ValueType beta)
 	{
