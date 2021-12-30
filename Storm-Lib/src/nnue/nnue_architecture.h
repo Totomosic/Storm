@@ -26,30 +26,32 @@
 #include "layers/affine_transform.h"
 #include "layers/clipped_relu.h"
 
-namespace Storm::NNUE {
+namespace Storm::NNUE
+{
 
-  // Input features used in evaluation function
-  // using FeatureSet = HalfKAv2_hm;
+    // Input features used in evaluation function
+    // using FeatureSet = HalfKAv2_hm;
 
-  // Number of input feature dimensions after conversion
-  constexpr IndexType TransformedFeatureDimensions = 1024;
-  constexpr IndexType PSQTBuckets = 8;
-  constexpr IndexType LayerStacks = 8;
+    // Number of input feature dimensions after conversion
+    constexpr IndexType TransformedFeatureDimensions = 1024;
+    constexpr IndexType PSQTBuckets = 8;
+    constexpr IndexType LayerStacks = 8;
 
-  namespace Layers {
+    namespace Layers
+    {
 
-    // Define network structure
-    using InputLayer = InputSlice<TransformedFeatureDimensions * 2>;
-    using HiddenLayer1 = ClippedReLU<AffineTransform<InputLayer, 8>>;
-    using HiddenLayer2 = ClippedReLU<AffineTransform<HiddenLayer1, 32>>;
-    using OutputLayer = AffineTransform<HiddenLayer2, 1>;
+        // Define network structure
+        using InputLayer = InputSlice<TransformedFeatureDimensions * 2>;
+        using HiddenLayer1 = ClippedReLU<AffineTransform<InputLayer, 8>>;
+        using HiddenLayer2 = ClippedReLU<AffineTransform<HiddenLayer1, 32>>;
+        using OutputLayer = AffineTransform<HiddenLayer2, 1>;
 
-  }  // namespace Layers
+    }   // namespace Layers
 
-  using Network = Layers::OutputLayer;
+    using Network = Layers::OutputLayer;
 
-  static_assert(TransformedFeatureDimensions % MaxSimdWidth == 0, "");
-  static_assert(Network::OutputDimensions == 1, "");
-  static_assert(std::is_same<Network::OutputType, std::int32_t>::value, "");
+    static_assert(TransformedFeatureDimensions % MaxSimdWidth == 0, "");
+    static_assert(Network::OutputDimensions == 1, "");
+    static_assert(std::is_same<Network::OutputType, std::int32_t>::value, "");
 
-}  // namespace Storm::NNUE
+}   // namespace Storm::NNUE

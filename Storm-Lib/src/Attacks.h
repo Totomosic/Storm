@@ -9,6 +9,7 @@
 namespace Storm
 {
 
+    // clang-format off
     constexpr uint64_t s_RookMagics[SQUARE_MAX] = {
         0xa8002c000108020ULL, 0x6c00049b0002001ULL, 0x100200010090040ULL, 0x2480041000800801ULL, 0x280028004000800ULL,
         0x900410008040022ULL, 0x280020001001080ULL, 0x2880002041000080ULL, 0xa000800080400034ULL, 0x4808020004000ULL,
@@ -22,7 +23,7 @@ namespace Storm
         0x12000810020004ULL, 0x1000100200040208ULL, 0x430000a044020001ULL, 0x280009023410300ULL, 0xe0100040002240ULL,
         0x200100401700ULL, 0x2244100408008080ULL, 0x8000400801980ULL, 0x2000810040200ULL, 0x8010100228810400ULL,
         0x2000009044210200ULL, 0x4080008040102101ULL, 0x40002080411d01ULL, 0x2005524060000901ULL, 0x502001008400422ULL,
-        0x489a000810200402ULL, 0x1004400080a13ULL, 0x4000011008020084ULL, 0x26002114058042ULL
+        0x489a000810200402ULL, 0x1004400080a13ULL, 0x4000011008020084ULL, 0x26002114058042ULL,
     };
 
     constexpr uint64_t s_BishopMagics[SQUARE_MAX] = {
@@ -38,7 +39,7 @@ namespace Storm
         0x41010500040c020ULL, 0x4012020c04210308ULL, 0x208220a202004080ULL, 0x111040120082000ULL, 0x6803040141280a00ULL,
         0x2101004202410000ULL, 0x8200000041108022ULL, 0x21082088000ULL, 0x2410204010040ULL, 0x40100400809000ULL,
         0x822088220820214ULL, 0x40808090012004ULL, 0x910224040218c9ULL, 0x402814422015008ULL, 0x90014004842410ULL,
-        0x1000042304105ULL, 0x10008830412a00ULL, 0x2520081090008908ULL, 0x40102000a0a60140ULL
+        0x1000042304105ULL, 0x10008830412a00ULL, 0x2520081090008908ULL, 0x40102000a0a60140ULL,
     };
 
     constexpr int s_RookIndexBits[SQUARE_MAX] = {
@@ -62,6 +63,7 @@ namespace Storm
         5, 5, 5, 5, 5, 5, 5, 5,
         6, 5, 5, 5, 5, 5, 5, 6,
     };
+    // clang-format on
 
     extern BitBoard s_NonSlidingAttacks[COLOR_MAX][PIECE_MAX][SQUARE_MAX];
     extern BitBoard s_SlidingAttacks[COLOR_MAX][PIECE_MAX][SQUARE_MAX];
@@ -73,10 +75,10 @@ namespace Storm
     extern BitBoard s_RookTable[SQUARE_MAX][4096];
     extern BitBoard s_BishopTable[SQUARE_MAX][1024];
 
-	void InitRays();
-	void InitAttacks();
+    void InitRays();
+    void InitAttacks();
 
-	BitBoard GetRay(Direction direction, SquareIndex fromSquare);
+    BitBoard GetRay(Direction direction, SquareIndex fromSquare);
 
     template<Piece PIECE>
     inline BitBoard GetAttacks(SquareIndex fromSquare, BitBoard blockers)
@@ -85,7 +87,8 @@ namespace Storm
         if constexpr (PIECE == PIECE_BISHOP)
         {
             blockers &= s_BishopMasks[fromSquare];
-            return s_BishopTable[fromSquare][(blockers * s_BishopMagics[fromSquare]) >> (64 - s_BishopIndexBits[fromSquare])];
+            return s_BishopTable[fromSquare]
+                                [(blockers * s_BishopMagics[fromSquare]) >> (64 - s_BishopIndexBits[fromSquare])];
         }
         if constexpr (PIECE == PIECE_ROOK)
         {
@@ -116,19 +119,19 @@ namespace Storm
     {
         switch (piece)
         {
-        case PIECE_KNIGHT:
-            return GetAttacks<PIECE_KNIGHT>(fromSquare);
-        case PIECE_KING:
-            return GetAttacks<PIECE_KING>(fromSquare);
-        case PIECE_BISHOP:
-            return GetAttacks<PIECE_BISHOP>(fromSquare, blockers);
-        case PIECE_ROOK:
-            return GetAttacks<PIECE_ROOK>(fromSquare, blockers);
-        case PIECE_QUEEN:
-            return GetAttacks<PIECE_QUEEN>(fromSquare, blockers);
-        default:
-            STORM_ASSERT(false, "Invalid piece type");
-            break;
+            case PIECE_KNIGHT:
+                return GetAttacks<PIECE_KNIGHT>(fromSquare);
+            case PIECE_KING:
+                return GetAttacks<PIECE_KING>(fromSquare);
+            case PIECE_BISHOP:
+                return GetAttacks<PIECE_BISHOP>(fromSquare, blockers);
+            case PIECE_ROOK:
+                return GetAttacks<PIECE_ROOK>(fromSquare, blockers);
+            case PIECE_QUEEN:
+                return GetAttacks<PIECE_QUEEN>(fromSquare, blockers);
+            default:
+                STORM_ASSERT(false, "Invalid piece type");
+                break;
         }
         return ZERO_BB;
     }
@@ -136,8 +139,8 @@ namespace Storm
     template<Color C>
     inline constexpr BitBoard GetPawnAttacks(BitBoard pawns)
     {
-        return C == COLOR_WHITE ? Shift<NORTH_EAST>(pawns) | Shift<NORTH_WEST>(pawns)
-                                : Shift<SOUTH_EAST>(pawns) | Shift<SOUTH_WEST>(pawns);
+        return C == COLOR_WHITE ? Shift<NORTH_EAST>(pawns) | Shift<NORTH_WEST>(pawns) :
+                                  Shift<SOUTH_EAST>(pawns) | Shift<SOUTH_WEST>(pawns);
     }
 
     // Return a bitboard representing the squares between a and b not including a or b
@@ -145,7 +148,7 @@ namespace Storm
     inline BitBoard GetBitBoardBetween(SquareIndex a, SquareIndex b)
     {
         BitBoard result = s_Lines[a][b] & ((ALL_SQUARES_BB << a) ^ (ALL_SQUARES_BB << b));
-        return BitBoard(result & (result - 1)); // Remove LSB
+        return BitBoard(result & (result - 1));   // Remove LSB
     }
 
     inline BitBoard GetLineBetween(SquareIndex a, SquareIndex b)

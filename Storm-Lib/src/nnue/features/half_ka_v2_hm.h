@@ -26,18 +26,22 @@
 #include "../../Position.h"
 #include "../../Types.h"
 
-namespace Storm {
+namespace Storm
+{
     struct StateInfo;
 }
 
-namespace Storm::NNUE {
+namespace Storm::NNUE
+{
 
     // Feature HalfKAv2_hm: Combination of the position of own king
     // and the position of pieces. Position mirrored such that king always on e..h files.
-    class HalfKAv2_hm {
+    class HalfKAv2_hm
+    {
 
         // unique number for each piece type on each square
-        enum {
+        enum
+        {
             PS_NONE = 0,
             PS_W_PAWN = 0,
             PS_B_PAWN = 1 * SQUARE_MAX,
@@ -53,6 +57,7 @@ namespace Storm::NNUE {
             PS_NB = 11 * SQUARE_MAX
         };
 
+        // clang-format off
         static constexpr IndexType PieceSquareIndex[COLOR_MAX][16] = {
             // convention: W - us, B - them
             // viewed from other side, W and B are reversed
@@ -61,6 +66,7 @@ namespace Storm::NNUE {
             { PS_NONE, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, PS_KING, PS_NONE,
               PS_NONE, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, PS_KING, PS_NONE }
         };
+        // clang-format on
 
         // Orient a square according to perspective (rotates by 180 for black)
         static SquareIndex orient(Color perspective, SquareIndex s, SquareIndex ksq);
@@ -76,9 +82,9 @@ namespace Storm::NNUE {
         static constexpr std::uint32_t HashValue = 0x7f234cb8u;
 
         // Number of feature dimensions
-        static constexpr IndexType Dimensions =
-            static_cast<IndexType>(SQUARE_MAX) * static_cast<IndexType>(PS_NB) / 2;
+        static constexpr IndexType Dimensions = static_cast<IndexType>(SQUARE_MAX) * static_cast<IndexType>(PS_NB) / 2;
 
+        // clang-format off
         static constexpr int KingBuckets[64] = {
           -1, -1, -1, -1, 31, 30, 29, 28,
           -1, -1, -1, -1, 27, 26, 25, 24,
@@ -89,25 +95,18 @@ namespace Storm::NNUE {
           -1, -1, -1, -1,  7,  6,  5,  4,
           -1, -1, -1, -1,  3,  2,  1,  0
         };
+        // clang-format on
 
         // Maximum number of simultaneously active features.
         static constexpr IndexType MaxActiveDimensions = 32;
         using IndexList = ValueList<IndexType, MaxActiveDimensions>;
 
         // Get a list of indices for active features
-        static void append_active_indices(
-            const Position& pos,
-            Color perspective,
-            IndexList& active);
+        static void append_active_indices(const Position& pos, Color perspective, IndexList& active);
 
         // Get a list of indices for recently changed features
         static void append_changed_indices(
-            SquareIndex ksq,
-            const DirtyPiece& dp,
-            Color perspective,
-            IndexList& removed,
-            IndexList& added
-        );
+          SquareIndex ksq, const DirtyPiece& dp, Color perspective, IndexList& removed, IndexList& added);
 
         // Returns the cost of updating one perspective, the most costly one.
         // Assumes no refresh needed.
@@ -119,6 +118,6 @@ namespace Storm::NNUE {
         static bool requires_refresh(const StateInfo* st, Color perspective);
     };
 
-}  // namespace Stockfish::Eval::NNUE::Features
+}   // namespace Stockfish::Eval::NNUE::Features
 
-#endif // #ifndef NNUE_FEATURES_HALF_KA_V2_HM_H_INCLUDED
+#endif   // #ifndef NNUE_FEATURES_HALF_KA_V2_HM_H_INCLUDED

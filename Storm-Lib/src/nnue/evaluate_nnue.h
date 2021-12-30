@@ -24,36 +24,40 @@
 
 #include <memory>
 
-namespace Storm::NNUE {
+namespace Storm::NNUE
+{
 
-  // Hash value of evaluation function structure
-  constexpr std::uint32_t HashValue =
-      FeatureTransformer::get_hash_value() ^ Network::get_hash_value();
+    // Hash value of evaluation function structure
+    constexpr std::uint32_t HashValue = FeatureTransformer::get_hash_value() ^ Network::get_hash_value();
 
-  // Deleter for automating release of memory area
-  template <typename T>
-  struct AlignedDeleter {
-    void operator()(T* ptr) const {
-      ptr->~T();
-      std_aligned_free(ptr);
-    }
-  };
+    // Deleter for automating release of memory area
+    template<typename T>
+    struct AlignedDeleter
+    {
+        void operator()(T* ptr) const
+        {
+            ptr->~T();
+            std_aligned_free(ptr);
+        }
+    };
 
-  template <typename T>
-  struct LargePageDeleter {
-    void operator()(T* ptr) const {
-      ptr->~T();
-      aligned_large_pages_free(ptr);
-    }
-  };
+    template<typename T>
+    struct LargePageDeleter
+    {
+        void operator()(T* ptr) const
+        {
+            ptr->~T();
+            aligned_large_pages_free(ptr);
+        }
+    };
 
-  template <typename T>
-  using AlignedPtr = std::unique_ptr<T, AlignedDeleter<T>>;
+    template<typename T>
+    using AlignedPtr = std::unique_ptr<T, AlignedDeleter<T>>;
 
-  template <typename T>
-  using LargePagePtr = std::unique_ptr<T, LargePageDeleter<T>>;
+    template<typename T>
+    using LargePagePtr = std::unique_ptr<T, LargePageDeleter<T>>;
 
-  void initialize();
-  bool load_eval(std::string filename, std::istream& stream);
+    void initialize();
+    bool load_eval(std::string filename, std::istream& stream);
 
-}  // namespace Storm::NNUE
+}   // namespace Storm::NNUE

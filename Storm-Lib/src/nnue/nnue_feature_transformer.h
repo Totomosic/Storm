@@ -25,9 +25,10 @@
 
 #include "features/half_ka_v2_hm.h"
 
-#include <cstring> // std::memset()
+#include <cstring>   // std::memset()
 
-namespace Storm::NNUE {
+namespace Storm::NNUE
+{
 
     using BiasType = std::int16_t;
     using WeightType = std::int16_t;
@@ -38,20 +39,20 @@ namespace Storm::NNUE {
     // vector registers.
 #define VECTOR
 
-    static_assert(PSQTBuckets % 8 == 0,
-        "Per feature PSQT values cannot be processed at granularity lower than 8 at a time.");
+    static_assert(
+      PSQTBuckets % 8 == 0, "Per feature PSQT values cannot be processed at granularity lower than 8 at a time.");
 
 #ifdef USE_AVX512
     typedef __m512i vec_t;
     typedef __m256i psqt_vec_t;
 #define vec_load(a) _mm512_load_si512(a)
-#define vec_store(a,b) _mm512_store_si512(a,b)
-#define vec_add_16(a,b) _mm512_add_epi16(a,b)
-#define vec_sub_16(a,b) _mm512_sub_epi16(a,b)
+#define vec_store(a, b) _mm512_store_si512(a, b)
+#define vec_add_16(a, b) _mm512_add_epi16(a, b)
+#define vec_sub_16(a, b) _mm512_sub_epi16(a, b)
 #define vec_load_psqt(a) _mm256_load_si256(a)
-#define vec_store_psqt(a,b) _mm256_store_si256(a,b)
-#define vec_add_psqt_32(a,b) _mm256_add_epi32(a,b)
-#define vec_sub_psqt_32(a,b) _mm256_sub_epi32(a,b)
+#define vec_store_psqt(a, b) _mm256_store_si256(a, b)
+#define vec_add_psqt_32(a, b) _mm256_add_epi32(a, b)
+#define vec_sub_psqt_32(a, b) _mm256_sub_epi32(a, b)
 #define vec_zero_psqt() _mm256_setzero_si256()
 #define NumRegistersSIMD 32
 
@@ -59,13 +60,13 @@ namespace Storm::NNUE {
     typedef __m256i vec_t;
     typedef __m256i psqt_vec_t;
 #define vec_load(a) _mm256_load_si256(a)
-#define vec_store(a,b) _mm256_store_si256(a,b)
-#define vec_add_16(a,b) _mm256_add_epi16(a,b)
-#define vec_sub_16(a,b) _mm256_sub_epi16(a,b)
+#define vec_store(a, b) _mm256_store_si256(a, b)
+#define vec_add_16(a, b) _mm256_add_epi16(a, b)
+#define vec_sub_16(a, b) _mm256_sub_epi16(a, b)
 #define vec_load_psqt(a) _mm256_load_si256(a)
-#define vec_store_psqt(a,b) _mm256_store_si256(a,b)
-#define vec_add_psqt_32(a,b) _mm256_add_epi32(a,b)
-#define vec_sub_psqt_32(a,b) _mm256_sub_epi32(a,b)
+#define vec_store_psqt(a, b) _mm256_store_si256(a, b)
+#define vec_add_psqt_32(a, b) _mm256_add_epi32(a, b)
+#define vec_sub_psqt_32(a, b) _mm256_sub_epi32(a, b)
 #define vec_zero_psqt() _mm256_setzero_si256()
 #define NumRegistersSIMD 16
 
@@ -73,13 +74,13 @@ namespace Storm::NNUE {
     typedef __m128i vec_t;
     typedef __m128i psqt_vec_t;
 #define vec_load(a) (*(a))
-#define vec_store(a,b) *(a)=(b)
-#define vec_add_16(a,b) _mm_add_epi16(a,b)
-#define vec_sub_16(a,b) _mm_sub_epi16(a,b)
+#define vec_store(a, b) *(a) = (b)
+#define vec_add_16(a, b) _mm_add_epi16(a, b)
+#define vec_sub_16(a, b) _mm_sub_epi16(a, b)
 #define vec_load_psqt(a) (*(a))
-#define vec_store_psqt(a,b) *(a)=(b)
-#define vec_add_psqt_32(a,b) _mm_add_epi32(a,b)
-#define vec_sub_psqt_32(a,b) _mm_sub_epi32(a,b)
+#define vec_store_psqt(a, b) *(a) = (b)
+#define vec_add_psqt_32(a, b) _mm_add_epi32(a, b)
+#define vec_sub_psqt_32(a, b) _mm_sub_epi32(a, b)
 #define vec_zero_psqt() _mm_setzero_si128()
 #define NumRegistersSIMD (Is64Bit ? 16 : 8)
 
@@ -87,13 +88,13 @@ namespace Storm::NNUE {
     typedef __m64 vec_t;
     typedef __m64 psqt_vec_t;
 #define vec_load(a) (*(a))
-#define vec_store(a,b) *(a)=(b)
-#define vec_add_16(a,b) _mm_add_pi16(a,b)
-#define vec_sub_16(a,b) _mm_sub_pi16(a,b)
+#define vec_store(a, b) *(a) = (b)
+#define vec_add_16(a, b) _mm_add_pi16(a, b)
+#define vec_sub_16(a, b) _mm_sub_pi16(a, b)
 #define vec_load_psqt(a) (*(a))
-#define vec_store_psqt(a,b) *(a)=(b)
-#define vec_add_psqt_32(a,b) _mm_add_pi32(a,b)
-#define vec_sub_psqt_32(a,b) _mm_sub_pi32(a,b)
+#define vec_store_psqt(a, b) *(a) = (b)
+#define vec_add_psqt_32(a, b) _mm_add_pi32(a, b)
+#define vec_sub_psqt_32(a, b) _mm_sub_pi32(a, b)
 #define vec_zero_psqt() _mm_setzero_si64()
 #define NumRegistersSIMD 8
 
@@ -101,21 +102,24 @@ namespace Storm::NNUE {
     typedef int16x8_t vec_t;
     typedef int32x4_t psqt_vec_t;
 #define vec_load(a) (*(a))
-#define vec_store(a,b) *(a)=(b)
-#define vec_add_16(a,b) vaddq_s16(a,b)
-#define vec_sub_16(a,b) vsubq_s16(a,b)
+#define vec_store(a, b) *(a) = (b)
+#define vec_add_16(a, b) vaddq_s16(a, b)
+#define vec_sub_16(a, b) vsubq_s16(a, b)
 #define vec_load_psqt(a) (*(a))
-#define vec_store_psqt(a,b) *(a)=(b)
-#define vec_add_psqt_32(a,b) vaddq_s32(a,b)
-#define vec_sub_psqt_32(a,b) vsubq_s32(a,b)
-#define vec_zero_psqt() psqt_vec_t{0}
+#define vec_store_psqt(a, b) *(a) = (b)
+#define vec_add_psqt_32(a, b) vaddq_s32(a, b)
+#define vec_sub_psqt_32(a, b) vsubq_s32(a, b)
+#define vec_zero_psqt() \
+    psqt_vec_t \
+    { \
+        0 \
+    }
 #define NumRegistersSIMD 16
 
 #else
 #undef VECTOR
 
 #endif
-
 
 #ifdef VECTOR
 
@@ -127,14 +131,11 @@ namespace Storm::NNUE {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wignored-attributes"
 
-    template <typename SIMDRegisterType,
-        typename LaneType,
-        int      NumLanes,
-        int      MaxRegisters>
-        static constexpr int BestRegisterCount()
+    template<typename SIMDRegisterType, typename LaneType, int NumLanes, int MaxRegisters>
+    static constexpr int BestRegisterCount()
     {
-#define RegisterSize  sizeof(SIMDRegisterType)
-#define LaneSize      sizeof(LaneType)
+#define RegisterSize sizeof(SIMDRegisterType)
+#define LaneSize sizeof(LaneType)
 
         static_assert(RegisterSize >= LaneSize);
         static_assert(MaxRegisters <= NumRegistersSIMD);
@@ -155,17 +156,17 @@ namespace Storm::NNUE {
         return 1;
     }
 
-    static constexpr int NumRegs = BestRegisterCount<vec_t, WeightType, TransformedFeatureDimensions, NumRegistersSIMD>();
+    static constexpr int NumRegs =
+      BestRegisterCount<vec_t, WeightType, TransformedFeatureDimensions, NumRegistersSIMD>();
     static constexpr int NumPsqtRegs = BestRegisterCount<psqt_vec_t, PSQTWeightType, PSQTBuckets, NumRegistersSIMD>();
 
 #pragma GCC diagnostic pop
 
 #endif
 
-
-
     // Input feature converter
-    class FeatureTransformer {
+    class FeatureTransformer
+    {
 
     private:
         // Number of output dimensions for one side
@@ -174,8 +175,8 @@ namespace Storm::NNUE {
 #ifdef VECTOR
         static constexpr IndexType TileHeight = NumRegs * sizeof(vec_t) / 2;
         static constexpr IndexType PsqtTileHeight = NumPsqtRegs * sizeof(psqt_vec_t) / 4;
-        static_assert(HalfDimensions% TileHeight == 0, "TileHeight must divide HalfDimensions");
-        static_assert(PSQTBuckets% PsqtTileHeight == 0, "PsqtTileHeight must divide PSQTBuckets");
+        static_assert(HalfDimensions % TileHeight == 0, "TileHeight must divide HalfDimensions");
+        static_assert(PSQTBuckets % PsqtTileHeight == 0, "PsqtTileHeight must divide PSQTBuckets");
 #endif
 
     public:
@@ -187,48 +188,48 @@ namespace Storm::NNUE {
         static constexpr IndexType OutputDimensions = HalfDimensions * 2;
 
         // Size of forward propagation buffer
-        static constexpr std::size_t BufferSize =
-            OutputDimensions * sizeof(OutputType);
+        static constexpr std::size_t BufferSize = OutputDimensions * sizeof(OutputType);
 
         // Hash value embedded in the evaluation file
-        static constexpr std::uint32_t get_hash_value() {
+        static constexpr std::uint32_t get_hash_value()
+        {
             return HalfKAv2_hm::HashValue ^ OutputDimensions;
         }
 
         // Read network parameters
-        bool read_parameters(std::istream& stream) {
+        bool read_parameters(std::istream& stream)
+        {
 
-            read_little_endian<BiasType      >(stream, biases, HalfDimensions);
-            read_little_endian<WeightType    >(stream, weights, HalfDimensions * InputDimensions);
+            read_little_endian<BiasType>(stream, biases, HalfDimensions);
+            read_little_endian<WeightType>(stream, weights, HalfDimensions * InputDimensions);
             read_little_endian<PSQTWeightType>(stream, psqtWeights, PSQTBuckets * InputDimensions);
 
             return !stream.fail();
         }
 
         // Write network parameters
-        bool write_parameters(std::ostream& stream) const {
+        bool write_parameters(std::ostream& stream) const
+        {
 
-            write_little_endian<BiasType      >(stream, biases, HalfDimensions);
-            write_little_endian<WeightType    >(stream, weights, HalfDimensions * InputDimensions);
+            write_little_endian<BiasType>(stream, biases, HalfDimensions);
+            write_little_endian<WeightType>(stream, weights, HalfDimensions * InputDimensions);
             write_little_endian<PSQTWeightType>(stream, psqtWeights, PSQTBuckets * InputDimensions);
 
             return !stream.fail();
         }
 
         // Convert input features
-        std::int32_t transform(const Position& pos, OutputType* output, int bucket) const {
+        std::int32_t transform(const Position& pos, OutputType* output, int bucket) const
+        {
             update_accumulator(pos, COLOR_WHITE);
             update_accumulator(pos, COLOR_BLACK);
 
-            const Color perspectives[2] = { pos.ColorToMove, OtherColor(pos.ColorToMove) };
+            const Color perspectives[2] = {pos.ColorToMove, OtherColor(pos.ColorToMove)};
             const auto& accumulation = pos.GetState()->Accumulator.accumulation;
             const auto& psqtAccumulation = pos.GetState()->Accumulator.psqtAccumulation;
 
-            const auto psqt = (
-                psqtAccumulation[perspectives[0]][bucket]
-                - psqtAccumulation[perspectives[1]][bucket]
-                ) / 2;
-
+            const auto psqt =
+              (psqtAccumulation[perspectives[0]][bucket] - psqtAccumulation[perspectives[1]][bucket]) / 2;
 
 #if defined(USE_AVX512)
 
@@ -243,13 +244,13 @@ namespace Storm::NNUE {
                 auto out = reinterpret_cast<__m512i*>(&output[offset]);
                 for (IndexType j = 0; j < NumChunks; ++j)
                 {
-                    __m512i sum0 = _mm512_load_si512(&reinterpret_cast<const __m512i*>
-                        (accumulation[perspectives[p]])[j * 2 + 0]);
-                    __m512i sum1 = _mm512_load_si512(&reinterpret_cast<const __m512i*>
-                        (accumulation[perspectives[p]])[j * 2 + 1]);
+                    __m512i sum0 =
+                      _mm512_load_si512(&reinterpret_cast<const __m512i*>(accumulation[perspectives[p]])[j * 2 + 0]);
+                    __m512i sum1 =
+                      _mm512_load_si512(&reinterpret_cast<const __m512i*>(accumulation[perspectives[p]])[j * 2 + 1]);
 
-                    _mm512_store_si512(&out[j], _mm512_permutexvar_epi64(Control,
-                        _mm512_max_epi8(_mm512_packs_epi16(sum0, sum1), Zero)));
+                    _mm512_store_si512(&out[j],
+                      _mm512_permutexvar_epi64(Control, _mm512_max_epi8(_mm512_packs_epi16(sum0, sum1), Zero)));
                 }
             }
             return psqt;
@@ -266,13 +267,13 @@ namespace Storm::NNUE {
                 auto out = reinterpret_cast<__m256i*>(&output[offset]);
                 for (IndexType j = 0; j < NumChunks; ++j)
                 {
-                    __m256i sum0 = _mm256_load_si256(&reinterpret_cast<const __m256i*>
-                        (accumulation[perspectives[p]])[j * 2 + 0]);
-                    __m256i sum1 = _mm256_load_si256(&reinterpret_cast<const __m256i*>
-                        (accumulation[perspectives[p]])[j * 2 + 1]);
+                    __m256i sum0 =
+                      _mm256_load_si256(&reinterpret_cast<const __m256i*>(accumulation[perspectives[p]])[j * 2 + 0]);
+                    __m256i sum1 =
+                      _mm256_load_si256(&reinterpret_cast<const __m256i*>(accumulation[perspectives[p]])[j * 2 + 1]);
 
-                    _mm256_store_si256(&out[j], _mm256_permute4x64_epi64(
-                        _mm256_max_epi8(_mm256_packs_epi16(sum0, sum1), Zero), Control));
+                    _mm256_store_si256(&out[j],
+                      _mm256_permute4x64_epi64(_mm256_max_epi8(_mm256_packs_epi16(sum0, sum1), Zero), Control));
                 }
             }
             return psqt;
@@ -293,10 +294,10 @@ namespace Storm::NNUE {
                 auto out = reinterpret_cast<__m128i*>(&output[offset]);
                 for (IndexType j = 0; j < NumChunks; ++j)
                 {
-                    __m128i sum0 = _mm_load_si128(&reinterpret_cast<const __m128i*>
-                        (accumulation[perspectives[p]])[j * 2 + 0]);
-                    __m128i sum1 = _mm_load_si128(&reinterpret_cast<const __m128i*>
-                        (accumulation[perspectives[p]])[j * 2 + 1]);
+                    __m128i sum0 =
+                      _mm_load_si128(&reinterpret_cast<const __m128i*>(accumulation[perspectives[p]])[j * 2 + 0]);
+                    __m128i sum1 =
+                      _mm_load_si128(&reinterpret_cast<const __m128i*>(accumulation[perspectives[p]])[j * 2 + 1]);
                     const __m128i packedbytes = _mm_packs_epi16(sum0, sum1);
 
 #ifdef USE_SSE41
@@ -331,7 +332,7 @@ namespace Storm::NNUE {
 #elif defined(USE_NEON)
 
             constexpr IndexType NumChunks = HalfDimensions / (SimdWidth / 2);
-            const int8x8_t Zero = { 0 };
+            const int8x8_t Zero = {0};
 
             for (IndexType p = 0; p < 2; ++p)
             {
@@ -360,12 +361,13 @@ namespace Storm::NNUE {
 
 #endif
 
-        } // end of function transform()
+        }   // end of function transform()
 
 
 
     private:
-        void update_accumulator(const Position& pos, const Color perspective) const {
+        void update_accumulator(const Position& pos, const Color perspective) const
+        {
 
             // The size must be enough to contain the largest possible update.
             // That might depend on the feature set and generally relies on the
@@ -373,22 +375,21 @@ namespace Storm::NNUE {
             // allow updates with more added/removed features than MaxActiveDimensions.
 
 #ifdef VECTOR
-    // Gcc-10.2 unnecessarily spills AVX2 registers if this array
-    // is defined in the VECTOR code below, once in each branch
+            // Gcc-10.2 unnecessarily spills AVX2 registers if this array
+            // is defined in the VECTOR code below, once in each branch
             vec_t acc[NumRegs];
             psqt_vec_t psqt[NumPsqtRegs];
 #endif
 
             // Look for a usable accumulator of an earlier position. We keep track
             // of the estimated gain in terms of features to be added/subtracted.
-            StateInfo* st = pos.GetState(), * next = nullptr;
+            StateInfo *st = pos.GetState(), *next = nullptr;
             int gain = HalfKAv2_hm::refresh_cost(pos);
             while (st->Previous && !st->Accumulator.computed[perspective])
             {
                 // This governs when a full feature refresh is needed and how many
                 // updates are better than just one full refresh.
-                if (HalfKAv2_hm::requires_refresh(st, perspective)
-                    || (gain -= HalfKAv2_hm::update_cost(st) + 1) < 0)
+                if (HalfKAv2_hm::requires_refresh(st, perspective) || (gain -= HalfKAv2_hm::update_cost(st) + 1) < 0)
                     break;
                 next = st;
                 st = st->Previous;
@@ -405,25 +406,21 @@ namespace Storm::NNUE {
                 // Gather all features to be updated.
                 const SquareIndex ksq = pos.GetKingSquare(perspective);
                 HalfKAv2_hm::IndexList removed[2], added[2];
-                HalfKAv2_hm::append_changed_indices(
-                    ksq, next->DirtyPiece, perspective, removed[0], added[0]);
+                HalfKAv2_hm::append_changed_indices(ksq, next->DirtyPiece, perspective, removed[0], added[0]);
                 for (StateInfo* st2 = pos.GetState(); st2 != next; st2 = st2->Previous)
-                    HalfKAv2_hm::append_changed_indices(
-                        ksq, st2->DirtyPiece, perspective, removed[1], added[1]);
+                    HalfKAv2_hm::append_changed_indices(ksq, st2->DirtyPiece, perspective, removed[1], added[1]);
 
                 // Mark the accumulators as computed.
                 next->Accumulator.computed[perspective] = true;
                 pos.GetState()->Accumulator.computed[perspective] = true;
 
                 // Now update the accumulators listed in states_to_update[], where the last element is a sentinel.
-                StateInfo* states_to_update[3] =
-                { next, next == pos.GetState() ? nullptr : pos.GetState(), nullptr };
+                StateInfo* states_to_update[3] = {next, next == pos.GetState() ? nullptr : pos.GetState(), nullptr};
 #ifdef VECTOR
                 for (IndexType j = 0; j < HalfDimensions / TileHeight; ++j)
                 {
                     // Load accumulator
-                    auto accTile = reinterpret_cast<vec_t*>(
-                        &st->Accumulator.accumulation[perspective][j * TileHeight]);
+                    auto accTile = reinterpret_cast<vec_t*>(&st->Accumulator.accumulation[perspective][j * TileHeight]);
                     for (IndexType k = 0; k < NumRegs; ++k)
                         acc[k] = vec_load(&accTile[k]);
 
@@ -449,7 +446,7 @@ namespace Storm::NNUE {
 
                         // Store accumulator
                         accTile = reinterpret_cast<vec_t*>(
-                            &states_to_update[i]->Accumulator.accumulation[perspective][j * TileHeight]);
+                          &states_to_update[i]->Accumulator.accumulation[perspective][j * TileHeight]);
                         for (IndexType k = 0; k < NumRegs; ++k)
                             vec_store(&accTile[k], acc[k]);
                     }
@@ -458,8 +455,8 @@ namespace Storm::NNUE {
                 for (IndexType j = 0; j < PSQTBuckets / PsqtTileHeight; ++j)
                 {
                     // Load accumulator
-                    auto accTilePsqt = reinterpret_cast<psqt_vec_t*>(
-                        &st->Accumulator.psqtAccumulation[perspective][j * PsqtTileHeight]);
+                    auto accTilePsqt =
+                      reinterpret_cast<psqt_vec_t*>(&st->Accumulator.psqtAccumulation[perspective][j * PsqtTileHeight]);
                     for (std::size_t k = 0; k < NumPsqtRegs; ++k)
                         psqt[k] = vec_load_psqt(&accTilePsqt[k]);
 
@@ -485,7 +482,7 @@ namespace Storm::NNUE {
 
                         // Store accumulator
                         accTilePsqt = reinterpret_cast<psqt_vec_t*>(
-                            &states_to_update[i]->Accumulator.psqtAccumulation[perspective][j * PsqtTileHeight]);
+                          &states_to_update[i]->Accumulator.psqtAccumulation[perspective][j * PsqtTileHeight]);
                         for (std::size_t k = 0; k < NumPsqtRegs; ++k)
                             vec_store_psqt(&accTilePsqt[k], psqt[k]);
                     }
@@ -495,11 +492,12 @@ namespace Storm::NNUE {
                 for (IndexType i = 0; states_to_update[i]; ++i)
                 {
                     std::memcpy(states_to_update[i]->accumulator.accumulation[perspective],
-                        st->accumulator.accumulation[perspective],
-                        HalfDimensions * sizeof(BiasType));
+                      st->accumulator.accumulation[perspective],
+                      HalfDimensions * sizeof(BiasType));
 
                     for (std::size_t k = 0; k < PSQTBuckets; ++k)
-                        states_to_update[i]->accumulator.psqtAccumulation[perspective][k] = st->accumulator.psqtAccumulation[perspective][k];
+                        states_to_update[i]->accumulator.psqtAccumulation[perspective][k] =
+                          st->accumulator.psqtAccumulation[perspective][k];
 
                     st = states_to_update[i];
 
@@ -540,8 +538,7 @@ namespace Storm::NNUE {
 #ifdef VECTOR
                 for (IndexType j = 0; j < HalfDimensions / TileHeight; ++j)
                 {
-                    auto biasesTile = reinterpret_cast<const vec_t*>(
-                        &biases[j * TileHeight]);
+                    auto biasesTile = reinterpret_cast<const vec_t*>(&biases[j * TileHeight]);
                     for (IndexType k = 0; k < NumRegs; ++k)
                         acc[k] = biasesTile[k];
 
@@ -554,8 +551,7 @@ namespace Storm::NNUE {
                             acc[k] = vec_add_16(acc[k], column[k]);
                     }
 
-                    auto accTile = reinterpret_cast<vec_t*>(
-                        &accumulator.accumulation[perspective][j * TileHeight]);
+                    auto accTile = reinterpret_cast<vec_t*>(&accumulator.accumulation[perspective][j * TileHeight]);
                     for (unsigned k = 0; k < NumRegs; k++)
                         vec_store(&accTile[k], acc[k]);
                 }
@@ -574,15 +570,14 @@ namespace Storm::NNUE {
                             psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
                     }
 
-                    auto accTilePsqt = reinterpret_cast<psqt_vec_t*>(
-                        &accumulator.psqtAccumulation[perspective][j * PsqtTileHeight]);
+                    auto accTilePsqt =
+                      reinterpret_cast<psqt_vec_t*>(&accumulator.psqtAccumulation[perspective][j * PsqtTileHeight]);
                     for (std::size_t k = 0; k < NumPsqtRegs; ++k)
                         vec_store_psqt(&accTilePsqt[k], psqt[k]);
                 }
 
 #else
-                std::memcpy(accumulator.accumulation[perspective], biases,
-                    HalfDimensions * sizeof(BiasType));
+                std::memcpy(accumulator.accumulation[perspective], biases, HalfDimensions * sizeof(BiasType));
 
                 for (std::size_t k = 0; k < PSQTBuckets; ++k)
                     accumulator.psqtAccumulation[perspective][k] = 0;
@@ -608,6 +603,6 @@ namespace Storm::NNUE {
         alignas(CacheLineSize) BiasType biases[HalfDimensions];
         alignas(CacheLineSize) WeightType weights[HalfDimensions * InputDimensions];
         alignas(CacheLineSize) PSQTWeightType psqtWeights[InputDimensions * PSQTBuckets];
-            };
+    };
 
-}  // namespace Storm::NNUE
+}   // namespace Storm::NNUE

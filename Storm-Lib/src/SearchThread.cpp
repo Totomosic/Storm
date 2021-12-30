@@ -43,13 +43,19 @@ namespace Storm
 
     void UpdatePV(Move* pv, Move move, Move* childPv)
     {
-        for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
+        for (*pv++ = move; childPv && *childPv != MOVE_NONE;)
             *pv++ = *childPv++;
         *pv = MOVE_NONE;
     }
 
     Search::Search()
-        : m_TimeManager(), m_TranspositionTable(), m_Limits(), m_ShouldStop(false), m_Stopped(false), m_EnableLogging(true), m_Threads()
+        : m_TimeManager(),
+          m_TranspositionTable(),
+          m_Limits(),
+          m_ShouldStop(false),
+          m_Stopped(false),
+          m_EnableLogging(true),
+          m_Threads()
     {
     }
 
@@ -58,13 +64,15 @@ namespace Storm
         m_PositionHistory.push_back(hash);
     }
 
-    void Search::Ponder(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
+    void Search::Ponder(
+      const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
     {
         limits.Infinite = true;
         SearchBestMove(position, limits, callback);
     }
 
-    BestMove Search::SearchBestMove(const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
+    BestMove Search::SearchBestMove(
+      const Position& position, SearchLimits limits, const std::function<void(const SearchResult&)>& callback)
     {
         StateInfo st;
         Position pos = position;
@@ -101,9 +109,13 @@ namespace Storm
             auto endTime = std::chrono::high_resolution_clock::now();
             auto elapsed = endTime - startTime;
             std::cout << "====================================" << std::endl;
-            std::cout << "Total Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << "ms" << std::endl;
+            std::cout << "Total Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()
+                      << "ms" << std::endl;
             std::cout << "Total Nodes: " << total << std::endl;
-            std::cout << "Nodes per Second: " << (size_t)(total / (double)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() * 1e9) << std::endl;
+            std::cout << "Nodes per Second: "
+                      << (size_t)(total /
+                                  (double)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() * 1e9)
+                      << std::endl;
         }
         return total;
     }
@@ -155,7 +167,15 @@ namespace Storm
         std::vector<std::thread> threads;
         for (int i = 1; i < m_Threads.size(); i++)
         {
-            threads.push_back(std::thread(std::bind(&Search::IterativeDeepeningSearch, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4), this, &m_Threads[i], depth, callback));
+            threads.push_back(std::thread(std::bind(&Search::IterativeDeepeningSearch,
+                                            std::placeholders::_1,
+                                            std::placeholders::_2,
+                                            std::placeholders::_3,
+                                            std::placeholders::_4),
+              this,
+              &m_Threads[i],
+              depth,
+              callback));
         }
 
         IterativeDeepeningSearch(&m_Threads[0], depth, callback);
@@ -173,14 +193,15 @@ namespace Storm
             if (mainThread.RootMoves[bestIndex].Pv.size() > 1)
                 ponderMove = mainThread.RootMoves[bestIndex].Pv[1];
         }
-        return { bestMove, ponderMove };
+        return {bestMove, ponderMove};
     }
 
     void Search::IterativeDeepeningSearch(Thread* thread, int maxDepth, const SearchCallback& callback)
     {
         SearchStack* stack = thread->Stack + Thread::StackOffset;
 
-        int multipv = std::clamp(m_Settings.MultiPv, GetMultiPv(m_Settings.SkillLevel), std::min(20, (int)thread->RootMoves.size()));
+        int multipv = std::clamp(
+          m_Settings.MultiPv, GetMultiPv(m_Settings.SkillLevel), std::min(20, (int)thread->RootMoves.size()));
 
         int depthSinceMoveChange = 0;
         float evalAverage = 0;
@@ -218,7 +239,7 @@ namespace Storm
                     break;
 
                 evalAverage += (thread->RootMoves[0].Score - evalAverage) * (thread->Depth < 8 ? 1.0f : 0.1f);
-             
+
                 if (thread->BestMoveChanges == 0)
                     depthSinceMoveChange++;
                 else
@@ -263,7 +284,8 @@ namespace Storm
             if (ShouldStopSearch(thread))
                 break;
 
-            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000) && thread->PvIndex < m_Settings.MultiPv)
+            if (isMainThread && ((value > alpha && value < beta) || m_TimeManager.TotalElapsedMs() > 3000) &&
+                thread->PvIndex < m_Settings.MultiPv)
             {
                 size_t nodes = GetTotalNodes();
                 RootMove& bestMove = thread->RootMoves[thread->PvIndex];
@@ -285,8 +307,10 @@ namespace Storm
                         std::cout << " upperbound";
                     else if (bestMove.Score >= beta)
                         std::cout << " lowerbound";
-                    std::cout << " nodes " << nodes << " nps " << size_t(nodes * 1000 / (m_TimeManager.TotalElapsedMs() + 1));
-                    std::cout << " time " << m_TimeManager.TotalElapsedMs() << " hashfull " << m_TranspositionTable.HashFull() << " multipv " << thread->PvIndex + 1;
+                    std::cout << " nodes " << nodes << " nps "
+                              << size_t(nodes * 1000 / (m_TimeManager.TotalElapsedMs() + 1));
+                    std::cout << " time " << m_TimeManager.TotalElapsedMs() << " hashfull "
+                              << m_TranspositionTable.HashFull() << " multipv " << thread->PvIndex + 1;
                     std::cout << " pv";
                     for (Move mv : bestMove.Pv)
                         std::cout << " " << UCI::FormatMove(mv);
@@ -325,7 +349,8 @@ namespace Storm
     }
 
     template<bool IsPvNode>
-    ValueType Search::AlphaBetaSearch(Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode)
+    ValueType Search::AlphaBetaSearch(
+      Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode)
     {
         constexpr int FirstMoveIndex = 1;
         Position& position = thread->Position;
@@ -390,14 +415,17 @@ namespace Storm
         }
         ttEntry = m_TranspositionTable.GetEntry(ttHash, ttHit);
 
-        ValueType ttValue = IsRoot ? thread->RootMoves[thread->PvIndex].Score : ttHit ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) : VALUE_NONE;
+        ValueType ttValue = IsRoot ? thread->RootMoves[thread->PvIndex].Score :
+                            ttHit  ? GetValueFromTT(ttEntry->GetValue(), stack->Ply) :
+                                     VALUE_NONE;
         Move ttMove = IsRoot ? thread->RootMoves[thread->PvIndex].Pv[0] : ttHit ? ttEntry->GetMove() : MOVE_NONE;
 
         if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth)
         {
             EntryBound bound = ttEntry->GetBound();
             STORM_ASSERT(ttEntry->GetMove() != MOVE_NONE || bound == BOUND_UPPER, "Invalid Entry");
-            if ((bound == BOUND_LOWER && ttValue >= beta) || (bound == BOUND_UPPER && ttValue <= alpha) || bound == BOUND_EXACT)
+            if ((bound == BOUND_LOWER && ttValue >= beta) || (bound == BOUND_UPPER && ttValue <= alpha) ||
+                bound == BOUND_EXACT)
             {
                 if (!position.IsCapture(ttMove))
                 {
@@ -437,13 +465,16 @@ namespace Storm
             }
 
             // Futility Pruning
-            if (position.GetNonPawnMaterial() > 0 && depth <= FutilityDepth && stack->StaticEvaluation - GetFutilityMargin(depth) >= beta)
+            if (position.GetNonPawnMaterial() > 0 && depth <= FutilityDepth &&
+                stack->StaticEvaluation - GetFutilityMargin(depth) >= beta)
             {
                 return stack->StaticEvaluation;
             }
 
             // Null move pruning
-            if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE && stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg && !IsMateScore(stack->StaticEvaluation))
+            if (depth >= NullMoveDepth && (stack - 1)->CurrentMove != MOVE_NONE && stack->SkipMove == MOVE_NONE &&
+                stack->StaticEvaluation >= beta && position.GetNonPawnMaterial() >= 2 * RookValueEg &&
+                !IsMateScore(stack->StaticEvaluation))
             {
                 UndoInfo undo;
                 position.ApplyNullMove(st, &undo);
@@ -452,7 +483,12 @@ namespace Storm
                 stack->CurrentMove = MOVE_NONE;
                 stack->MoveCount = FirstMoveIndex;
 
-                ValueType value = -AlphaBetaSearch<false>(thread, stack + 1, depth - GetNullMoveDepthReduction(depth, stack->StaticEvaluation, beta), -beta, -beta + 1, true);
+                ValueType value = -AlphaBetaSearch<false>(thread,
+                  stack + 1,
+                  depth - GetNullMoveDepthReduction(depth, stack->StaticEvaluation, beta),
+                  -beta,
+                  -beta + 1,
+                  true);
                 position.UndoNullMove(undo);
                 if (value >= beta)
                     return IsMateScore(value) ? beta : value;
@@ -473,10 +509,12 @@ namespace Storm
                         stack->CurrentMove = move;
                         position.ApplyMove(move, st, &undo);
                         (stack + 1)->Position = position;
-                        ValueType value = -QuiescenceSearch<false>(thread, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
+                        ValueType value =
+                          -QuiescenceSearch<false>(thread, stack + 1, 0, -probCutBeta, -probCutBeta + 1, !cutNode);
                         if (value >= probCutBeta)
                         {
-                            value = -AlphaBetaSearch<false>(thread, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, !cutNode);
+                            value = -AlphaBetaSearch<false>(
+                              thread, stack + 1, depth - ProbCutDepth + 1, -probCutBeta, -probCutBeta + 1, !cutNode);
                         }
 
                         position.UndoMove(move, undo);
@@ -499,14 +537,16 @@ namespace Storm
 
         while ((move = selector.GetNextMove()) != MOVE_NONE)
         {
-            if (IsRoot && std::find(thread->RootMoves.begin() + thread->PvIndex, thread->RootMoves.end(), move) == thread->RootMoves.end())
+            if (IsRoot && std::find(thread->RootMoves.begin() + thread->PvIndex, thread->RootMoves.end(), move) ==
+                            thread->RootMoves.end())
                 continue;
 
             if (move == stack->SkipMove)
                 continue;
 
             if (thread->IsMain() && IsRoot && m_TimeManager.TotalElapsedMs() > 3000 && m_EnableLogging)
-                std::cout << "info depth " << depth << " currmove " << UCI::FormatMove(move) << " currmovenumber " << moveIndex + 1 << std::endl;
+                std::cout << "info depth " << depth << " currmove " << UCI::FormatMove(move) << " currmovenumber "
+                          << moveIndex + 1 << std::endl;
 
             const bool givesCheck = position.GivesCheck(move);
             const bool isCapture = position.IsCapture(move);
@@ -529,7 +569,8 @@ namespace Storm
             if (!IsRoot && moveIndex > FirstMoveIndex && depth <= CmhPruneDepth)
             {
                 int piecePosition = position.GetPieceOnSquare(GetFromSquare(move)) * SQUARE_MAX + GetToSquare(move);
-                if ((cmhPtr[0] == nullptr || cmhPtr[0][piecePosition] < 0) && (cmhPtr[1] == nullptr || cmhPtr[1][piecePosition] < 0))
+                if ((cmhPtr[0] == nullptr || cmhPtr[0][piecePosition] < 0) &&
+                    (cmhPtr[1] == nullptr || cmhPtr[1][piecePosition] < 0))
                     continue;
             }
 
@@ -543,11 +584,14 @@ namespace Storm
             int depthExtension = 0;
 
             // Singular extension
-            if (!IsRoot && depth >= SingularExtensionDepth && stack->SkipMove == MOVE_NONE && move == ttMove && ttHit && !IsMateScore(ttValue) && ttEntry->GetBound() == BOUND_LOWER && ttEntry->GetDepth() >= depth - SingularDepthTolerance)
+            if (!IsRoot && depth >= SingularExtensionDepth && stack->SkipMove == MOVE_NONE && move == ttMove && ttHit &&
+                !IsMateScore(ttValue) && ttEntry->GetBound() == BOUND_LOWER &&
+                ttEntry->GetDepth() >= depth - SingularDepthTolerance)
             {
                 ValueType singularBeta = GetSingularBeta(ttValue, depth);
                 stack->SkipMove = move;
-                ValueType score = AlphaBetaSearch<false>(thread, stack, GetSingularDepth(depth), singularBeta - 1, singularBeta, cutNode);
+                ValueType score = AlphaBetaSearch<false>(
+                  thread, stack, GetSingularDepth(depth), singularBeta - 1, singularBeta, cutNode);
                 stack->SkipMove = MOVE_NONE;
                 if (score < singularBeta)
                     depthExtension = 1;
@@ -560,7 +604,8 @@ namespace Storm
             {
                 // CMH Extension
                 int piecePosition = position.GetPieceOnSquare(GetFromSquare(move)) * SQUARE_MAX + GetToSquare(move);
-                if (cmhPtr[0] != nullptr && cmhPtr[1] != nullptr && cmhPtr[0][piecePosition] >= MAX_HISTORY_SCORE / 2 && cmhPtr[1][piecePosition] >= MAX_HISTORY_SCORE / 2)
+                if (cmhPtr[0] != nullptr && cmhPtr[1] != nullptr && cmhPtr[0][piecePosition] >= MAX_HISTORY_SCORE / 2 &&
+                    cmhPtr[1][piecePosition] >= MAX_HISTORY_SCORE / 2)
                 {
                     depthExtension = 1;
                 }
@@ -581,7 +626,8 @@ namespace Storm
             ValueType value;
             bool fullDepthSearch = false;
 
-            if (depth >= LmrDepth && moveIndex >= LmrMoveIndex + 2 * IsRoot && (!isCaptureOrPromotion || cutNode) && !depthExtension)
+            if (depth >= LmrDepth && moveIndex >= LmrMoveIndex + 2 * IsRoot && (!isCaptureOrPromotion || cutNode) &&
+                !depthExtension)
             {
                 int reduction = GetLmrReduction<IsPvNode>(improving, depth, moveIndex);
                 if ((stack - 1)->MoveCount > 13)
@@ -590,7 +636,8 @@ namespace Storm
                 if (cutNode && move != stack->Killers[0])
                     reduction += 2;
 
-                reduction -= 2 * GetHistoryScore(stack, stack->Position, cmhPtr, move, &thread->Tables) / MAX_HISTORY_SCORE;
+                reduction -=
+                  2 * GetHistoryScore(stack, stack->Position, cmhPtr, move, &thread->Tables) / MAX_HISTORY_SCORE;
 
                 int lmrDepth = std::clamp(newDepth - reduction, 1, newDepth);
                 value = -AlphaBetaSearch<false>(thread, stack + 1, lmrDepth, -(alpha + 1), -alpha, true);
@@ -617,7 +664,8 @@ namespace Storm
             }
 
             position.UndoMove(move, undo);
-            STORM_ASSERT(position.Hash.Hash == preHash, "Invalid {} {}", GetFENFromPosition(position), UCI::FormatMove(move));
+            STORM_ASSERT(
+              position.Hash.Hash == preHash, "Invalid {} {}", GetFENFromPosition(position), UCI::FormatMove(move));
 
             if (ShouldStopSearch(thread))
             {
@@ -648,7 +696,7 @@ namespace Storm
                 bestMove = move;
                 if (value > alpha)
                 {
-                    
+
                     alpha = value;
                     if (IsPvNode)
                         UpdatePV(stack->PV, move, (stack + 1)->PV);
@@ -683,12 +731,18 @@ namespace Storm
         }
 
         if (stack->SkipMove == MOVE_NONE)
-            ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestValue >= alpha) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply), stack->StaticEvaluation);
+            ttEntry->Update(ttHash,
+              bestMove,
+              depth,
+              bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestValue >= alpha) ? BOUND_EXACT : BOUND_UPPER),
+              GetValueForTT(bestValue, stack->Ply),
+              stack->StaticEvaluation);
         return bestValue;
     }
 
     template<bool IsPvNode>
-    ValueType Search::QuiescenceSearch(Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode)
+    ValueType Search::QuiescenceSearch(
+      Thread* thread, SearchStack* stack, int depth, ValueType alpha, ValueType beta, bool cutNode)
     {
         STORM_ASSERT(alpha < beta, "Invalid bounds");
         STORM_ASSERT(stack->SkipMove == MOVE_NONE, "Invalid skip move");
@@ -725,7 +779,8 @@ namespace Storm
         if (!IsPvNode && ttHit && ttEntry->GetDepth() >= depth && !IsMateScore(ttValue))
         {
             EntryBound bound = ttEntry->GetBound();
-            if ((bound == BOUND_LOWER && ttValue >= beta) || (bound == BOUND_UPPER && ttValue <= alpha) || (bound == BOUND_EXACT))
+            if ((bound == BOUND_LOWER && ttValue >= beta) || (bound == BOUND_UPPER && ttValue <= alpha) ||
+                (bound == BOUND_EXACT))
                 return ttValue;
         }
 
@@ -770,7 +825,8 @@ namespace Storm
             ++moveIndex;
             bool givesCheck = position.GivesCheck(move);
 
-            if (bestValue > -VALUE_MATE && !givesCheck && !inCheck && futilityBase > -VALUE_MATE && GetMoveType(move) != PROMOTION)
+            if (bestValue > -VALUE_MATE && !givesCheck && !inCheck && futilityBase > -VALUE_MATE &&
+                GetMoveType(move) != PROMOTION)
             {
                 if (moveIndex > 2)
                     continue;
@@ -808,7 +864,12 @@ namespace Storm
         if (inCheck && bestValue == -VALUE_MATE)
             return MatedIn(stack->Ply);
 
-        ttEntry->Update(ttHash, bestMove, depth, bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER), GetValueForTT(bestValue, stack->Ply), stack->StaticEvaluation);
+        ttEntry->Update(ttHash,
+          bestMove,
+          depth,
+          bestValue >= beta ? BOUND_LOWER : ((IsPvNode && bestMove != MOVE_NONE) ? BOUND_EXACT : BOUND_UPPER),
+          GetValueForTT(bestValue, stack->Ply),
+          stack->StaticEvaluation);
         return bestValue;
     }
 
@@ -820,7 +881,8 @@ namespace Storm
             stack->Killers[0] = move;
         }
         if ((stack - 1)->CurrentMove != MOVE_NONE)
-            thread->Tables.CounterMoves[GetFromSquare((stack - 1)->CurrentMove)][GetToSquare((stack - 1)->CurrentMove)] = move;
+            thread->Tables
+              .CounterMoves[GetFromSquare((stack - 1)->CurrentMove)][GetToSquare((stack - 1)->CurrentMove)] = move;
     }
 
     bool Search::IsDraw(const Position& position, SearchStack* stack) const
@@ -838,7 +900,7 @@ namespace Storm
                 if (*(stack->PositionHistory - ply) == hash)
                 {
                     count++;
-                    if (count >= 1) // 2
+                    if (count >= 1)   // 2
                         return true;
                 }
                 ply += 2;
@@ -899,7 +961,8 @@ namespace Storm
         else
         {
             int colorTime = position.ColorToMove == COLOR_WHITE ? m_Limits.WhiteTime : m_Limits.BlackTime;
-            int colorIncrement = position.ColorToMove == COLOR_WHITE ? m_Limits.WhiteIncrement : m_Limits.BlackIncrement;
+            int colorIncrement =
+              position.ColorToMove == COLOR_WHITE ? m_Limits.WhiteIncrement : m_Limits.BlackIncrement;
             int allocatedTime = 0;
 
             if (colorIncrement > 0)
@@ -924,7 +987,8 @@ namespace Storm
         }
     }
 
-    std::vector<RootMove> Search::GenerateRootMoves(const Position& position, const std::unordered_set<Move>& only) const
+    std::vector<RootMove> Search::GenerateRootMoves(
+      const Position& position, const std::unordered_set<Move>& only) const
     {
         Move buffer[MAX_MOVES];
         MoveList list(buffer);
@@ -935,7 +999,7 @@ namespace Storm
             if (only.empty() || only.find(move) != only.end())
             {
                 RootMove mv;
-                mv.Pv = { move };
+                mv.Pv = {move};
                 mv.Score = -VALUE_MATE;
                 mv.PreviousScore = -VALUE_MATE;
                 mv.SelDepth = 0;
@@ -963,7 +1027,7 @@ namespace Storm
         {
             ClearTable<Move, SQUARE_MAX, SQUARE_MAX>(thread->Tables.CounterMoves, MOVE_NONE);
             ClearTable<int16_t, COLOR_MAX, SQUARE_MAX, SQUARE_MAX>(thread->Tables.History, 0);
-            ClearTable<int16_t, P_LIMIT, SQUARE_MAX, P_LIMIT* SQUARE_MAX>(thread->Tables.CounterMoveHistory, 0);
+            ClearTable<int16_t, P_LIMIT, SQUARE_MAX, P_LIMIT * SQUARE_MAX>(thread->Tables.CounterMoveHistory, 0);
             thread->Initialized = true;
         }
         SearchStack* stackPtr = thread->Stack;

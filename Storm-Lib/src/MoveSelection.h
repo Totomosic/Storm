@@ -11,79 +11,104 @@
 namespace Storm
 {
 
-	struct SearchTables;
-	struct SearchStack;
+    struct SearchTables;
+    struct SearchStack;
 
-	STORM_API enum MoveSelectionStage
-	{
-		FIND_TT_MOVE,
-		GENERATE_CAPTURES,
-		FIND_GOOD_CAPTURES,
-		GENERATE_QUIETS,
-		FIND_QUIETS,
-		FIND_BAD_CAPTURES,
-		DONE,
-	};
+    STORM_API enum MoveSelectionStage
+    {
+        FIND_TT_MOVE,
+        GENERATE_CAPTURES,
+        FIND_GOOD_CAPTURES,
+        GENERATE_QUIETS,
+        FIND_QUIETS,
+        FIND_BAD_CAPTURES,
+        DONE,
+    };
 
-	STORM_API enum MoveSelectorType
-	{
-		ALL_MOVES,
-		QUIESCENCE,
-	};
+    STORM_API enum MoveSelectorType
+    {
+        ALL_MOVES,
+        QUIESCENCE,
+    };
 
-	// Deliberately don't initialize
-	struct STORM_API ValueMove
-	{
-	public:
-		Storm::Move Move;
-		int16_t Value;
+    // Deliberately don't initialize
+    struct STORM_API ValueMove
+    {
+    public:
+        Storm::Move Move;
+        int16_t Value;
 
-	public:
-		ValueMove() = default;
+    public:
+        ValueMove() = default;
 
-		// Don't initialize value
-		inline ValueMove(Storm::Move mv)
-			: Move(mv)
-		{}
-	};
+        // Don't initialize value
+        inline ValueMove(Storm::Move mv) : Move(mv) {}
+    };
 
-	inline bool operator==(const ValueMove& left, const ValueMove& right) { return left.Move == right.Move; }
-	inline bool operator!=(const ValueMove& left, const ValueMove& right) { return left.Move != right.Move; }
-	inline bool operator==(const ValueMove& left, Move right) { return left.Move == right; }
-	inline bool operator!=(const ValueMove& left, Move right) { return left.Move != right; }
-	inline bool operator<(const ValueMove& left, const ValueMove& right) { return left.Value < right.Value; }
-	inline bool operator>(const ValueMove& left, const ValueMove& right) { return left.Value > right.Value; }
+    inline bool operator==(const ValueMove& left, const ValueMove& right)
+    {
+        return left.Move == right.Move;
+    }
 
-	template<MoveSelectorType TYPE>
-	class STORM_API MoveSelector
-	{
-	private:
-		ValueMove m_MoveBuffer[MAX_MOVES];
-		ValueMove* m_Start;
-		ValueMove* m_End;
-		ValueMove* m_BadCapturesStart;
-		ValueMove* m_BadCapturesEnd;
+    inline bool operator!=(const ValueMove& left, const ValueMove& right)
+    {
+        return left.Move != right.Move;
+    }
 
-		MoveSelectionStage m_Stage;
-		const Position& m_Position;
-		Move m_HashMove;
-		Move* m_Killers;
-		Move m_CounterMove;
-		SearchStack* m_Stack;
-		SearchTables* m_Tables;
+    inline bool operator==(const ValueMove& left, Move right)
+    {
+        return left.Move == right;
+    }
 
-	public:
-		MoveSelector(const Position& position, SearchStack* stack, Move hashMove, Move counterMove, Move killers[2], SearchTables* tables);
-		MoveSelector(const Position& position);
+    inline bool operator!=(const ValueMove& left, Move right)
+    {
+        return left.Move != right;
+    }
 
-		inline MoveSelectionStage GetCurrentStage() const { return m_Stage; }
+    inline bool operator<(const ValueMove& left, const ValueMove& right)
+    {
+        return left.Value < right.Value;
+    }
 
-		Move GetNextMove();
+    inline bool operator>(const ValueMove& left, const ValueMove& right)
+    {
+        return left.Value > right.Value;
+    }
 
-	private:
-		void NextStage();
-		void GenerateCaptures();
-		void GenerateQuiets();
-	};
+    template<MoveSelectorType TYPE>
+    class STORM_API MoveSelector
+    {
+    private:
+        ValueMove m_MoveBuffer[MAX_MOVES];
+        ValueMove* m_Start;
+        ValueMove* m_End;
+        ValueMove* m_BadCapturesStart;
+        ValueMove* m_BadCapturesEnd;
+
+        MoveSelectionStage m_Stage;
+        const Position& m_Position;
+        Move m_HashMove;
+        Move* m_Killers;
+        Move m_CounterMove;
+        SearchStack* m_Stack;
+        SearchTables* m_Tables;
+
+    public:
+        MoveSelector(const Position& position, SearchStack* stack, Move hashMove, Move counterMove, Move killers[2],
+          SearchTables* tables);
+        MoveSelector(const Position& position);
+
+        inline MoveSelectionStage GetCurrentStage() const
+        {
+            return m_Stage;
+        }
+
+        Move GetNextMove();
+
+    private:
+        void NextStage();
+        void GenerateCaptures();
+        void GenerateQuiets();
+    };
 
 }

@@ -18,7 +18,7 @@
 
 // Code for calculating NNUE evaluation function
 
-#define EvalFileDefaultName   "nn-9e3c6298299a.nnue"
+#define EvalFileDefaultName "nn-9e3c6298299a.nnue"
 
 #include <iostream>
 #include <set>
@@ -32,7 +32,8 @@
 
 #include "evaluate_nnue.h"
 
-namespace Storm::NNUE {
+namespace Storm::NNUE
+{
 
     // Input feature converter
     LargePagePtr<FeatureTransformer> featureTransformer;
@@ -44,46 +45,54 @@ namespace Storm::NNUE {
     std::string fileName;
     std::string netDescription;
 
-    namespace Detail {
+    namespace Detail
+    {
 
         // Initialize the evaluation function parameters
-        template <typename T>
-        void initialize(AlignedPtr<T>& pointer) {
+        template<typename T>
+        void initialize(AlignedPtr<T>& pointer)
+        {
 
             pointer.reset(reinterpret_cast<T*>(std_aligned_alloc(alignof(T), sizeof(T))));
             std::memset(pointer.get(), 0, sizeof(T));
         }
 
-        template <typename T>
-        void initialize(LargePagePtr<T>& pointer) {
+        template<typename T>
+        void initialize(LargePagePtr<T>& pointer)
+        {
 
-            static_assert(alignof(T) <= 4096, "aligned_large_pages_alloc() may fail for such a big alignment requirement of T");
+            static_assert(
+              alignof(T) <= 4096, "aligned_large_pages_alloc() may fail for such a big alignment requirement of T");
             pointer.reset(reinterpret_cast<T*>(aligned_large_pages_alloc(sizeof(T))));
             std::memset(pointer.get(), 0, sizeof(T));
         }
 
         // Read evaluation function parameters
-        template <typename T>
-        bool read_parameters(std::istream& stream, T& reference) {
+        template<typename T>
+        bool read_parameters(std::istream& stream, T& reference)
+        {
 
             std::uint32_t header;
             header = read_little_endian<std::uint32_t>(stream);
-            if (!stream || header != T::get_hash_value()) return false;
+            if (!stream || header != T::get_hash_value())
+                return false;
             return reference.read_parameters(stream);
         }
 
         // Write evaluation function parameters
-        template <typename T>
-        bool write_parameters(std::ostream& stream, const T& reference) {
+        template<typename T>
+        bool write_parameters(std::ostream& stream, const T& reference)
+        {
 
             write_little_endian<std::uint32_t>(stream, T::get_hash_value());
             return reference.write_parameters(stream);
         }
 
-    }  // namespace Detail
+    }   // namespace Detail
 
     // Initialize the evaluation function parameters
-    void initialize() {
+    void initialize()
+    {
 
         Detail::initialize(featureTransformer);
         for (std::size_t i = 0; i < LayerStacks; ++i)
@@ -98,7 +107,8 @@ namespace Storm::NNUE {
         version = read_little_endian<std::uint32_t>(stream);
         *hashValue = read_little_endian<std::uint32_t>(stream);
         size = read_little_endian<std::uint32_t>(stream);
-        if (!stream || version != Version) return false;
+        if (!stream || version != Version)
+            return false;
         desc->resize(size);
         stream.read(&(*desc)[0], size);
         return !stream.fail();
@@ -115,29 +125,39 @@ namespace Storm::NNUE {
     }
 
     // Read network parameters
-    bool read_parameters(std::istream& stream) {
+    bool read_parameters(std::istream& stream)
+    {
 
         std::uint32_t hashValue;
-        if (!read_header(stream, &hashValue, &netDescription)) return false;
-        if (hashValue != HashValue) return false;
-        if (!Detail::read_parameters(stream, *featureTransformer)) return false;
+        if (!read_header(stream, &hashValue, &netDescription))
+            return false;
+        if (hashValue != HashValue)
+            return false;
+        if (!Detail::read_parameters(stream, *featureTransformer))
+            return false;
         for (std::size_t i = 0; i < LayerStacks; ++i)
-            if (!Detail::read_parameters(stream, *(network[i]))) return false;
+            if (!Detail::read_parameters(stream, *(network[i])))
+                return false;
         return stream && stream.peek() == std::ios::traits_type::eof();
     }
 
     // Write network parameters
-    bool write_parameters(std::ostream& stream) {
+    bool write_parameters(std::ostream& stream)
+    {
 
-        if (!write_header(stream, HashValue, netDescription)) return false;
-        if (!Detail::write_parameters(stream, *featureTransformer)) return false;
+        if (!write_header(stream, HashValue, netDescription))
+            return false;
+        if (!Detail::write_parameters(stream, *featureTransformer))
+            return false;
         for (std::size_t i = 0; i < LayerStacks; ++i)
-            if (!Detail::write_parameters(stream, *(network[i]))) return false;
+            if (!Detail::write_parameters(stream, *(network[i])))
+                return false;
         return (bool)stream;
     }
 
     // Evaluation function. Perform differential calculation.
-    ValueType EvaluateNNUE(const Position& pos, bool adjusted) {
+    ValueType EvaluateNNUE(const Position& pos, bool adjusted)
+    {
 
         // We manually align the arrays on the stack because with gcc < 9.3
         // overaligning stack variables with alignas() doesn't work correctly.
@@ -146,15 +166,14 @@ namespace Storm::NNUE {
         int delta = 7;
 
 #if defined(ALIGNAS_ON_STACK_VARIABLES_BROKEN)
-        TransformedFeatureType transformedFeaturesUnaligned[
-            FeatureTransformer::BufferSize + alignment / sizeof(TransformedFeatureType)];
+        TransformedFeatureType
+          transformedFeaturesUnaligned[FeatureTransformer::BufferSize + alignment / sizeof(TransformedFeatureType)];
         char bufferUnaligned[Network::BufferSize + alignment];
 
         auto* transformedFeatures = align_ptr_up<alignment>(&transformedFeaturesUnaligned[0]);
         auto* buffer = align_ptr_up<alignment>(&bufferUnaligned[0]);
 #else
-        alignas(alignment)
-            TransformedFeatureType transformedFeatures[FeatureTransformer::BufferSize];
+        alignas(alignment) TransformedFeatureType transformedFeatures[FeatureTransformer::BufferSize];
         alignas(alignment) char buffer[Network::BufferSize];
 #endif
 
@@ -164,15 +183,16 @@ namespace Storm::NNUE {
 
         // Give more value to positional evaluation when material is balanced
         ValueType eval;
-        if (adjusted
-            && abs(pos.GetNonPawnMaterial(COLOR_WHITE) - pos.GetNonPawnMaterial(COLOR_BLACK)) <= RookValueMg - BishopValueMg)
+        if (adjusted && abs(pos.GetNonPawnMaterial(COLOR_WHITE) - pos.GetNonPawnMaterial(COLOR_BLACK)) <=
+                          RookValueMg - BishopValueMg)
             eval = static_cast<ValueType>(((128 - delta) * psqt + (128 + delta) * positional) / 128 / OutputScale);
         else
             eval = static_cast<ValueType>((psqt + positional) / OutputScale);
         return 136 * eval / 216;
     }
 
-    struct NnueEvalTrace {
+    struct NnueEvalTrace
+    {
         static_assert(LayerStacks == PSQTBuckets);
 
         ValueType psqt[LayerStacks];
@@ -180,7 +200,8 @@ namespace Storm::NNUE {
         std::size_t correctBucket;
     };
 
-    static NnueEvalTrace trace_evaluate(const Position& pos) {
+    static NnueEvalTrace trace_evaluate(const Position& pos)
+    {
 
         // We manually align the arrays on the stack because with gcc < 9.3
         // overaligning stack variables with alignas() doesn't work correctly.
@@ -188,21 +209,21 @@ namespace Storm::NNUE {
         constexpr uint64_t alignment = CacheLineSize;
 
 #if defined(ALIGNAS_ON_STACK_VARIABLES_BROKEN)
-        TransformedFeatureType transformedFeaturesUnaligned[
-            FeatureTransformer::BufferSize + alignment / sizeof(TransformedFeatureType)];
+        TransformedFeatureType
+          transformedFeaturesUnaligned[FeatureTransformer::BufferSize + alignment / sizeof(TransformedFeatureType)];
         char bufferUnaligned[Network::BufferSize + alignment];
 
         auto* transformedFeatures = align_ptr_up<alignment>(&transformedFeaturesUnaligned[0]);
         auto* buffer = align_ptr_up<alignment>(&bufferUnaligned[0]);
 #else
-        alignas(alignment)
-            TransformedFeatureType transformedFeatures[FeatureTransformer::BufferSize];
+        alignas(alignment) TransformedFeatureType transformedFeatures[FeatureTransformer::BufferSize];
         alignas(alignment) char buffer[Network::BufferSize];
 #endif
 
-        NnueEvalTrace t{};
+        NnueEvalTrace t {};
         t.correctBucket = (Popcount(pos.GetPieces()) - 1) / 4;
-        for (std::size_t bucket = 0; bucket < LayerStacks; ++bucket) {
+        for (std::size_t bucket = 0; bucket < LayerStacks; ++bucket)
+        {
             const auto psqt = featureTransformer->transform(pos, transformedFeatures, bucket);
             const auto output = network[bucket]->propagate(transformedFeatures, buffer);
 
@@ -217,11 +238,12 @@ namespace Storm::NNUE {
     }
 
     // Load eval, from a file stream or a memory stream
-    bool load_eval(std::string name, std::istream& stream) {
+    bool load_eval(std::string name, std::istream& stream)
+    {
 
         initialize();
         fileName = name;
         return read_parameters(stream);
     }
 
-} // namespace Storm::NNUE
+}   // namespace Storm::NNUE
